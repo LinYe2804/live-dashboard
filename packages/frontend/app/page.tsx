@@ -680,7 +680,7 @@ function ShieldOverlay({
           <span>STATUS</span>
           <b>{statusText}</b>
         </div>
-        <p className="shield-footnote">实时状态已被猫爪加密 · 请尊重边界喵</p>
+        <p className="shield-footnote">实时状态已被加密 · 请尊重边界喵</p>
       </div>
 
       {showPassword && (

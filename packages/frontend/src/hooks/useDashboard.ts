@@ -17,7 +17,7 @@ function todayStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function useDashboard(dashboardId?: string) {
+export function useDashboard(dashboardId?: string, adminToken?: string) {
   const [current, setCurrent] = useState<CurrentResponse | null>(null);
   const [timeline, setTimeline] = useState<TimelineResponse | null>(null);
   const [selectedDate, setSelectedDate] = useState("");
@@ -25,8 +25,9 @@ export function useDashboard(dashboardId?: string) {
   const [error, setError] = useState<string | null>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const requestOptions = useMemo<DashboardRequestOptions | undefined>(() => {
-    return dashboardId ? { dashboardId } : undefined;
-  }, [dashboardId]);
+    if (!dashboardId && !adminToken) return undefined;
+    return { dashboardId, adminToken };
+  }, [adminToken, dashboardId]);
 
   useEffect(() => {
     if (!selectedDate) setSelectedDate(todayStr());

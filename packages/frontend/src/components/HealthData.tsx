@@ -33,9 +33,10 @@ interface Props {
   selectedDate: string;
   deviceId?: string;
   dashboardId?: string;
+  adminToken?: string;
 }
 
-export default function HealthData({ selectedDate, deviceId, dashboardId }: Props) {
+export default function HealthData({ selectedDate, deviceId, dashboardId, adminToken }: Props) {
   const [data, setData] = useState<HealthDataResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +47,12 @@ export default function HealthData({ selectedDate, deviceId, dashboardId }: Prop
     setLoading(true);
     setError(null);
 
-    fetchHealthData(selectedDate, controller.signal, deviceId, dashboardId ? { dashboardId } : undefined)
+    fetchHealthData(
+      selectedDate,
+      controller.signal,
+      deviceId,
+      dashboardId || adminToken ? { dashboardId, adminToken } : undefined,
+    )
       .then((d) => {
         if (!controller.signal.aborted) setData(d);
       })
@@ -60,7 +66,7 @@ export default function HealthData({ selectedDate, deviceId, dashboardId }: Prop
       });
 
     return () => controller.abort();
-  }, [dashboardId, selectedDate, deviceId]);
+  }, [adminToken, dashboardId, selectedDate, deviceId]);
 
   // Group records by type, get latest value for each
   const grouped = useMemo(() => {

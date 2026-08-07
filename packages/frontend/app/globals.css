@@ -595,6 +595,344 @@ body.night-mode .status-pointer::after {
   scrollbar-color: var(--color-primary) transparent;
 }
 
+/* === Privacy shield === */
+.shielded-dashboard-content {
+  filter: blur(14px) saturate(0.35);
+  transform: scale(1.025);
+  user-select: none;
+  pointer-events: none;
+}
+
+.shield-overlay-open {
+  overflow: hidden;
+}
+
+.shield-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 24px;
+  color: #fff8f4;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 91, 121, 0.24), transparent 34%),
+    radial-gradient(circle at 80% 75%, rgba(94, 32, 67, 0.52), transparent 38%),
+    linear-gradient(145deg, rgba(24, 8, 20, 0.88), rgba(68, 14, 39, 0.92));
+  backdrop-filter: blur(16px);
+  isolation: isolate;
+}
+
+.shield-noise {
+  position: absolute;
+  inset: -50%;
+  z-index: -1;
+  opacity: 0.12;
+  background-image: repeating-linear-gradient(
+    118deg,
+    transparent 0 18px,
+    rgba(255, 255, 255, 0.18) 19px,
+    transparent 20px 38px
+  );
+  animation: shield-drift 18s linear infinite;
+}
+
+.shield-orbit {
+  position: absolute;
+  color: rgba(255, 170, 190, 0.28);
+  font-size: clamp(2rem, 7vw, 6rem);
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.shield-orbit-one {
+  top: 8%;
+  left: -4%;
+  transform: rotate(-12deg);
+}
+
+.shield-orbit-two {
+  right: -3%;
+  bottom: 9%;
+  transform: rotate(10deg);
+}
+
+.shield-warning-card {
+  position: relative;
+  width: min(680px, 92vw);
+  padding: clamp(42px, 7vw, 72px) clamp(24px, 6vw, 64px) 38px;
+  text-align: center;
+  border: 2px solid rgba(255, 192, 205, 0.68);
+  border-radius: 32px 10px 32px 10px;
+  background: rgba(27, 8, 21, 0.72);
+  box-shadow:
+    0 0 0 7px rgba(255, 111, 145, 0.08),
+    0 26px 80px rgba(0, 0, 0, 0.48),
+    inset 0 0 50px rgba(255, 105, 140, 0.08);
+}
+
+.shield-warning-card::before,
+.shield-warning-card::after {
+  content: "";
+  position: absolute;
+  width: 68px;
+  height: 68px;
+  border-color: #ff7899;
+}
+
+.shield-warning-card::before {
+  top: -10px;
+  left: -10px;
+  border-top: 5px solid;
+  border-left: 5px solid;
+}
+
+.shield-warning-card::after {
+  right: -10px;
+  bottom: -10px;
+  border-right: 5px solid;
+  border-bottom: 5px solid;
+}
+
+.shield-cat {
+  position: absolute;
+  top: -48px;
+  left: 50%;
+  width: 112px;
+  height: 92px;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  border: 3px solid #ff7899;
+  border-radius: 50% 50% 43% 43%;
+  color: #3a1228;
+  background: #ffd2dc;
+  box-shadow: 0 10px 28px rgba(255, 93, 132, 0.35);
+}
+
+.shield-cat-ear {
+  position: absolute;
+  top: -24px;
+  width: 42px;
+  height: 42px;
+  border: 3px solid #ff7899;
+  background: #ffd2dc;
+  transform: rotate(45deg);
+  z-index: -1;
+}
+
+.shield-cat-ear-left { left: 5px; }
+.shield-cat-ear-right { right: 5px; }
+
+.shield-cat-face {
+  margin-top: 4px;
+  font-size: 23px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.shield-kicker {
+  margin-bottom: 12px;
+  color: #ff9db4;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.28em;
+}
+
+.shield-warning-card h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 6vw, 3.7rem);
+  font-weight: 950;
+  letter-spacing: -0.04em;
+  text-shadow: 0 4px 24px rgba(255, 80, 125, 0.36);
+}
+
+.shield-message {
+  margin-top: 10px;
+  color: #ff90aa;
+  font-size: clamp(1.4rem, 4vw, 2.45rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.shield-redacted {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 28px auto 18px;
+  padding: 12px 18px;
+  border: 1px dashed rgba(255, 184, 200, 0.48);
+  border-radius: 8px;
+  color: rgba(255, 226, 232, 0.78);
+  background: rgba(255, 255, 255, 0.04);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+.shield-redacted b {
+  overflow: hidden;
+  white-space: nowrap;
+  animation: shield-redact 1.7s steps(2, end) infinite;
+}
+
+.shield-footnote {
+  color: rgba(255, 235, 239, 0.62);
+  font-size: 12px;
+}
+
+.shield-close-button {
+  position: fixed;
+  right: max(22px, env(safe-area-inset-right));
+  bottom: max(22px, env(safe-area-inset-bottom));
+  padding: 10px 19px;
+  border: 1px solid rgba(255, 214, 223, 0.5);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(20, 5, 16, 0.72);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.shield-close-button:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 102, 139, 0.36);
+}
+
+.shield-password-card {
+  position: fixed;
+  right: max(22px, env(safe-area-inset-right));
+  bottom: calc(max(22px, env(safe-area-inset-bottom)) + 58px);
+  width: min(390px, calc(100vw - 44px));
+  padding: 18px;
+  border: 1px solid rgba(255, 190, 205, 0.54);
+  border-radius: 18px;
+  color: #fff;
+  background: rgba(24, 7, 19, 0.94);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.48);
+}
+
+.shield-password-card label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.shield-password-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.shield-password-row input,
+.shield-password-row button {
+  min-width: 0;
+  border: 1px solid rgba(255, 190, 205, 0.42);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.shield-password-row button {
+  font-weight: 800;
+  background: #c83f68;
+  cursor: pointer;
+}
+
+.shield-password-error {
+  margin-top: 8px;
+  color: #ff9db4;
+  font-size: 11px;
+}
+
+.shield-admin-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-card));
+}
+
+.shield-switch {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.shield-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.shield-switch-track {
+  position: relative;
+  width: 54px;
+  height: 29px;
+  border: 2px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-cream);
+  transition: 0.25s ease;
+}
+
+.shield-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  color: #7a3b56;
+  background: #fff;
+  box-shadow: 0 2px 7px rgba(62, 19, 40, 0.2);
+  font-size: 9px;
+  transition: 0.25s ease;
+}
+
+.shield-switch input:checked + .shield-switch-track {
+  border-color: #c83f68;
+  background: #c83f68;
+}
+
+.shield-switch input:checked + .shield-switch-track .shield-switch-thumb {
+  transform: translateX(25px);
+  color: #c83f68;
+}
+
+.shield-switch input:focus-visible + .shield-switch-track {
+  outline: 3px solid rgba(200, 63, 104, 0.3);
+  outline-offset: 2px;
+}
+
+@keyframes shield-drift {
+  to { transform: translate3d(8%, 6%, 0) rotate(2deg); }
+}
+
+@keyframes shield-redact {
+  0%, 100% { opacity: 0.48; transform: translateX(-2px); }
+  50% { opacity: 1; transform: translateX(2px); }
+}
+
+@media (max-width: 640px) {
+  .shield-admin-control { align-items: flex-start; flex-direction: column; }
+  .shield-redacted { gap: 8px; font-size: 9px; }
+  .shield-password-row { grid-template-columns: 1fr; }
+}
+
 /* === Dashed separator === */
 .separator-dashed {
   border-top: 2px dashed var(--color-border);

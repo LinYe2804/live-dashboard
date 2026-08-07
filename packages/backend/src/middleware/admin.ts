@@ -32,16 +32,18 @@ export function ensureAdminAuthorized(req: Request): Response | null {
     );
   }
 
-  const token = readToken(req);
-  const isAuthorized = token
-    ? ADMIN_SECRETS.some((secret) => safeEqual(token, secret))
-    : false;
-
-  if (!isAuthorized) {
+  if (!isAdminAuthorized(req)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   return null;
+}
+
+export function isAdminAuthorized(req: Request): boolean {
+  const token = readToken(req);
+  return token
+    ? ADMIN_SECRETS.some((secret) => safeEqual(token, secret))
+    : false;
 }
 
 function safeEqual(left: string, right: string): boolean {

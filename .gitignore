@@ -6,6 +6,7 @@ dist/
 *.db-journal
 *.db-wal
 *.db-shm
+*.tsbuildinfo
 .env
 .env.local
 agents/windows/config.json

@@ -5,7 +5,7 @@ import {
   getAdminDeviceConfigs,
   upsertAdminDeviceConfig,
 } from "../middleware/auth";
-import { getSiteConfig } from "../services/site-config";
+import { getSiteConfig, updateShieldEnabled } from "../services/site-config";
 import { normalizeDashboardProfileInput } from "../services/site-config";
 import { updateSiteConfigFromAdmin } from "../services/site-config";
 
@@ -29,9 +29,30 @@ export function handleAdminConfigGet(req: Request): Response {
       displayName: site.displayName,
       siteTitle: site.siteTitle,
       siteDescription: site.siteDescription,
+      shieldEnabled: site.shieldEnabled,
     },
     devices: getAdminDeviceConfigs(),
   });
+}
+
+export async function handleAdminShieldUpdate(req: Request): Promise<Response> {
+  const unauthorized = ensureAdminAuthorized(req);
+  if (unauthorized) return unauthorized;
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const enabled = (body as { enabled?: unknown })?.enabled;
+  if (typeof enabled !== "boolean") {
+    return Response.json({ error: "enabled must be a boolean" }, { status: 400 });
+  }
+
+  updateShieldEnabled(enabled);
+  return Response.json({ ok: true, shieldEnabled: enabled });
 }
 
 export async function handleAdminSiteUpdate(req: Request): Promise<Response> {
@@ -56,6 +77,7 @@ export async function handleAdminSiteUpdate(req: Request): Promise<Response> {
       displayName: site.displayName,
       siteTitle: site.siteTitle,
       siteDescription: site.siteDescription,
+      shieldEnabled: site.shieldEnabled,
     },
   });
 }

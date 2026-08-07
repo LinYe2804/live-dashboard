@@ -13,6 +13,7 @@ import {
   handleAdminDeviceDelete,
   handleAdminDeviceUpsert,
   handleAdminSiteUpdate,
+  handleAdminShieldUpdate,
   handleAdminVerify,
   handleConfig,
   handleDashboardCreate,
@@ -22,6 +23,7 @@ import { handleProxy } from "./routes/proxy";
 import { injectSiteConfig } from "./services/site-config";
 import { cleanupUnconfiguredDeviceData } from "./db";
 import { getConfiguredDeviceIds } from "./middleware/auth";
+import { createShieldedResponse, shouldShieldRequest } from "./services/shield";
 
 // Start scheduled cleanup tasks (import triggers setInterval registration)
 import "./services/cleanup";
@@ -118,6 +120,18 @@ function appendCorsHeaders(response: Response): Response {
 async function handleApiRequest(req: Request, url: URL): Promise<Response> {
   const { pathname } = url;
 
+  if (req.method === "GET" && shouldShieldRequest(req)) {
+    if (pathname === "/api/current") return createShieldedResponse("current", url);
+    if (pathname === "/api/timeline") return createShieldedResponse("timeline", url);
+    if (pathname === "/api/health-data") return createShieldedResponse("health-data", url);
+    if (pathname === "/api/proxy") {
+      const endpoint = url.searchParams.get("endpoint");
+      if (endpoint === "current" || endpoint === "timeline" || endpoint === "health-data") {
+        return createShieldedResponse(endpoint, url);
+      }
+    }
+  }
+
   if (pathname === "/api/report" && req.method === "POST") {
     return await handleReport(req);
   }
@@ -160,6 +174,9 @@ async function handleApiRequest(req: Request, url: URL): Promise<Response> {
   }
   if (pathname === "/api/config/site" && req.method === "POST") {
     return await handleAdminSiteUpdate(req);
+  }
+  if (pathname === "/api/config/shield" && req.method === "POST") {
+    return await handleAdminShieldUpdate(req);
   }
   if (pathname === "/api/config/devices" && req.method === "POST") {
     return await handleAdminDeviceUpsert(req);

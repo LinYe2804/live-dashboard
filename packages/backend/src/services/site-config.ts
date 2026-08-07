@@ -12,6 +12,7 @@ export interface SiteConfig {
   siteDescription: string;
   siteFavicon: string;
   dashboards: DashboardProfile[];
+  shieldEnabled: boolean;
 }
 
 export interface DashboardProfile {
@@ -34,6 +35,7 @@ const RESERVED_DASHBOARD_ID = "local";
 const RUNTIME_DISPLAY_NAME_KEY = "display_name";
 const RUNTIME_SITE_TITLE_KEY = "site_title";
 const RUNTIME_SITE_DESC_KEY = "site_description";
+const RUNTIME_SHIELD_ENABLED_KEY = "shield_enabled";
 
 function nonEmpty(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
@@ -202,7 +204,17 @@ export function getSiteConfig(): SiteConfig {
     siteDescription,
     siteFavicon: isValidFaviconUrl(rawFavicon) ? rawFavicon : DEFAULT_FAVICON,
     dashboards: getDashboards(),
+    shieldEnabled: runtimeSettings[RUNTIME_SHIELD_ENABLED_KEY] === "true",
   };
+}
+
+export function isShieldEnabled(): boolean {
+  return getRuntimeSiteSettings()[RUNTIME_SHIELD_ENABLED_KEY] === "true";
+}
+
+export function updateShieldEnabled(enabled: boolean): boolean {
+  upsertRuntimeSiteSetting(RUNTIME_SHIELD_ENABLED_KEY, enabled ? "true" : "false");
+  return enabled;
 }
 
 function updateRuntimeStringSetting(

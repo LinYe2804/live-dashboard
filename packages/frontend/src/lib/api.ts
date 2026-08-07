@@ -12,6 +12,7 @@ export interface DashboardProfile {
 export interface DashboardRequestOptions {
   baseUrl?: string;
   dashboardId?: string;
+  adminToken?: string;
 }
 
 export interface DashboardMutationPayload {
@@ -25,6 +26,7 @@ export interface AdminSiteConfig {
   displayName: string;
   siteTitle: string;
   siteDescription: string;
+  shieldEnabled: boolean;
 }
 
 export interface AdminSiteConfigUpdate {
@@ -82,6 +84,7 @@ async function fetchJsonWithTimeout<T>(
   url: string,
   signal?: AbortSignal,
   timeoutMs: number = API_TIMEOUT_MS,
+  headers?: HeadersInit,
 ): Promise<T> {
   const controller = new AbortController();
   let timedOut = false;
@@ -102,6 +105,7 @@ async function fetchJsonWithTimeout<T>(
     const res = await fetch(url, {
       signal: controller.signal,
       cache: "no-store",
+      headers,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json() as Promise<T>;
@@ -165,6 +169,7 @@ export interface CurrentResponse {
   recent_activities: ActivityRecord[];
   server_time: string;
   viewer_count: number;
+  shielded?: boolean;
 }
 
 export interface TimelineResponse {
@@ -177,7 +182,12 @@ export async function fetchCurrent(
   signal?: AbortSignal,
   options?: DashboardRequestOptions,
 ): Promise<CurrentResponse> {
-  return fetchJsonWithTimeout<CurrentResponse>(buildApiUrl("/api/current", options), signal);
+  return fetchJsonWithTimeout<CurrentResponse>(
+    buildApiUrl("/api/current", options),
+    signal,
+    API_TIMEOUT_MS,
+    buildOptionalAdminHeaders(options?.adminToken),
+  );
 }
 
 export async function fetchTimeline(
@@ -191,7 +201,12 @@ export async function fetchTimeline(
     tz: String(tz),
   });
   const url = withQuery(buildApiUrl("/api/timeline", options), params);
-  return fetchJsonWithTimeout<TimelineResponse>(url, signal);
+  return fetchJsonWithTimeout<TimelineResponse>(
+    url,
+    signal,
+    API_TIMEOUT_MS,
+    buildOptionalAdminHeaders(options?.adminToken),
+  );
 }
 
 export interface HealthRecord {
@@ -214,6 +229,7 @@ export interface SiteConfig {
   siteDescription: string;
   siteFavicon: string;
   dashboards: DashboardProfile[];
+  shieldEnabled: boolean;
 }
 
 const defaultConfig: SiteConfig = {
@@ -222,6 +238,7 @@ const defaultConfig: SiteConfig = {
   siteDescription: "What is xuyihong doing right now?",
   siteFavicon: "/favicon.ico",
   dashboards: [],
+  shieldEnabled: false,
 };
 
 export { defaultConfig };
@@ -279,6 +296,7 @@ export async function fetchConfig(
       siteDescription: typeof data.siteDescription === "string" ? data.siteDescription : defaultConfig.siteDescription,
       siteFavicon: favicon,
       dashboards: dashboards.length > 0 ? dashboards : defaultConfig.dashboards,
+      shieldEnabled: data.shieldEnabled === true,
     };
   } catch {
     return defaultConfig;
@@ -298,7 +316,17 @@ export async function fetchHealthData(
   });
   if (deviceId) params.set("device_id", deviceId);
   const url = withQuery(buildApiUrl("/api/health-data", options), params);
-  return fetchJsonWithTimeout<HealthDataResponse>(url, signal);
+  return fetchJsonWithTimeout<HealthDataResponse>(
+    url,
+    signal,
+    API_TIMEOUT_MS,
+    buildOptionalAdminHeaders(options?.adminToken),
+  );
+}
+
+function buildOptionalAdminHeaders(adminToken?: string): HeadersInit | undefined {
+  const normalized = adminToken?.trim();
+  return normalized ? { Authorization: `Bearer ${normalized}` } : undefined;
 }
 
 function buildAdminHeaders(adminToken: string): HeadersInit {
@@ -335,7 +363,8 @@ function normalizeAdminSiteConfig(value: unknown): AdminSiteConfig | null {
   if (
     typeof record.displayName !== "string" ||
     typeof record.siteTitle !== "string" ||
-    typeof record.siteDescription !== "string"
+    typeof record.siteDescription !== "string" ||
+    typeof record.shieldEnabled !== "boolean"
   ) {
     return null;
   }
@@ -344,6 +373,7 @@ function normalizeAdminSiteConfig(value: unknown): AdminSiteConfig | null {
     displayName: record.displayName,
     siteTitle: record.siteTitle,
     siteDescription: record.siteDescription,
+    shieldEnabled: record.shieldEnabled,
   };
 }
 
@@ -461,6 +491,25 @@ export async function updateAdminSiteConfig(
   const site = normalizeAdminSiteConfig((data as { site?: unknown }).site);
   if (!site) throw new Error("Invalid site config response");
   return site;
+}
+
+export async function updateShieldState(
+  enabled: boolean,
+  adminToken: string,
+): Promise<boolean> {
+  const res = await fetch(buildApiUrl("/api/config/shield"), {
+    method: "POST",
+    headers: buildAdminHeaders(adminToken),
+    body: JSON.stringify({ enabled }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) throw new Error(await parseApiError(res));
+  const data = await res.json() as { shieldEnabled?: unknown };
+  if (typeof data.shieldEnabled !== "boolean") {
+    throw new Error("Invalid shield config response");
+  }
+  return data.shieldEnabled;
 }
 
 export async function upsertAdminDeviceConfig(

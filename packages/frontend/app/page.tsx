@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useConfig, useConfigLoader, ConfigContext } from "@/hooks/useConfig";
 import type {
@@ -20,6 +20,7 @@ import {
   removeAdminDeviceConfig,
   removeDashboard,
   updateAdminSiteConfig,
+  updateShieldState,
   upsertAdminDeviceConfig,
   verifyAdminToken,
 } from "@/lib/api";
@@ -61,21 +62,31 @@ export default function Home() {
       displayName: site.displayName,
       siteTitle: site.siteTitle,
       siteDescription: site.siteDescription,
+      shieldEnabled: site.shieldEnabled,
     }));
+  }, []);
+
+  const handleShieldUpdated = useCallback((shieldEnabled: boolean) => {
+    setRuntimeConfig((prev) => ({ ...prev, shieldEnabled }));
   }, []);
 
   return (
     <ConfigContext.Provider value={runtimeConfig}>
       <SiteMetadataSync />
-      <HomeInner onSiteConfigUpdated={handleSiteConfigUpdated} />
+      <HomeInner
+        onSiteConfigUpdated={handleSiteConfigUpdated}
+        onShieldUpdated={handleShieldUpdated}
+      />
     </ConfigContext.Provider>
   );
 }
 
 function HomeInner({
   onSiteConfigUpdated,
+  onShieldUpdated,
 }: {
   onSiteConfigUpdated: (site: AdminSiteConfig) => void;
+  onShieldUpdated: (enabled: boolean) => void;
 }) {
   const config = useConfig();
   const { displayName } = config;
@@ -100,8 +111,8 @@ function HomeInner({
 
   const handleAdminUnlock = useCallback(async (token: string) => {
     const normalized = token.trim();
-    setAdminToken(normalized);
     await loadAdminConfig(normalized);
+    setAdminToken(normalized);
   }, [loadAdminConfig]);
 
   const handleAdminLock = useCallback(() => {
@@ -216,6 +227,29 @@ function HomeInner({
     }
   }, [adminToken]);
 
+  const handleShieldChange = useCallback(async (enabled: boolean) => {
+    if (!adminToken.trim()) {
+      setAdminStatus("请先填写管理密码");
+      return;
+    }
+
+    try {
+      setAdminStatus(enabled ? "正在开启屏蔽状态..." : "正在关闭屏蔽状态...");
+      const nextEnabled = await updateShieldState(enabled, adminToken.trim());
+      onShieldUpdated(nextEnabled);
+      setAdminStatus(nextEnabled ? "屏蔽状态已开启，访客数据已替换为乱码" : "屏蔽状态已关闭");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "请检查管理密码";
+      setAdminStatus(`屏蔽状态更新失败：${message}`);
+    }
+  }, [adminToken, onShieldUpdated]);
+
+  const handleShieldClose = useCallback(async (password: string) => {
+    const normalized = password.trim();
+    const nextEnabled = await updateShieldState(false, normalized);
+    onShieldUpdated(nextEnabled);
+  }, [onShieldUpdated]);
+
   const dashboards = useMemo<DashboardOption[]>(() => {
     return [
       {
@@ -249,7 +283,7 @@ function HomeInner({
     return dashboards.find((dashboard) => dashboard.id === selectedDashboardId) ?? dashboards[0];
   }, [dashboards, selectedDashboardId]);
   const activeDashboardId = activeDashboard?.isPrimary ? undefined : activeDashboard?.id;
-  const { current, timeline, selectedDate, changeDate, loading, error, viewerCount } = useDashboard(activeDashboardId);
+  const { current, timeline, selectedDate, changeDate, loading, error, viewerCount } = useDashboard(activeDashboardId, adminToken);
   const snapshotTargets = useMemo(() => {
     const activeId = activeDashboard?.id;
     return dashboards.filter((dashboard) => dashboard.id !== activeId);
@@ -279,7 +313,9 @@ function HomeInner({
       for (const dashboard of snapshotTargets) {
         void fetchCurrent(
           undefined,
-          dashboard.isPrimary ? undefined : { dashboardId: dashboard.id },
+          dashboard.isPrimary
+            ? (adminToken ? { adminToken } : undefined)
+            : { dashboardId: dashboard.id, adminToken },
         )
           .then((response) => {
             if (disposed || requestId !== snapshotRequestIdRef.current) return;
@@ -306,7 +342,7 @@ function HomeInner({
       disposed = true;
       window.clearInterval(timer);
     };
-  }, [snapshotTargets]);
+  }, [adminToken, snapshotTargets]);
 
   useEffect(() => {
     if (!hasHealthData && tab === "health") setTab("activity");
@@ -358,7 +394,7 @@ function HomeInner({
       selectedDate,
       controller.signal,
       selectedDeviceIdResolved,
-      activeDashboardId ? { dashboardId: activeDashboardId } : undefined,
+      activeDashboardId || adminToken ? { dashboardId: activeDashboardId, adminToken } : undefined,
     )
       .then((result) => {
         if (!controller.signal.aborted) {
@@ -372,7 +408,7 @@ function HomeInner({
       });
 
     return () => controller.abort();
-  }, [activeDashboardId, selectedDate, selectedDeviceIdResolved]);
+  }, [activeDashboardId, adminToken, selectedDate, selectedDeviceIdResolved]);
 
   const filteredTimeline = useMemo(() => {
     if (!timeline || !selectedDevice) return timeline;
@@ -399,8 +435,11 @@ function HomeInner({
     };
   }, [allOffline]);
 
+  const shieldVisible = !adminToken && config.shieldEnabled;
+
   return (
     <>
+      <div className={shieldVisible ? "shielded-dashboard-content" : undefined}>
       <Header
         serverTime={current?.server_time}
         viewerCount={viewerCount}
@@ -414,6 +453,7 @@ function HomeInner({
             displayName: config.displayName,
             siteTitle: config.siteTitle,
             siteDescription: config.siteDescription,
+            shieldEnabled: config.shieldEnabled,
           }}
           devices={adminDevices}
           adminToken={adminToken}
@@ -427,6 +467,8 @@ function HomeInner({
           onSaveSite={handleSiteSave}
           onSaveDevice={handleDeviceSave}
           onDeleteDevice={handleDeviceDelete}
+          shieldEnabled={config.shieldEnabled}
+          onShieldChange={handleShieldChange}
         />
       )}
 
@@ -556,6 +598,7 @@ function HomeInner({
                   selectedDate={selectedDate}
                   deviceId={selectedDevice?.device_id}
                   dashboardId={activeDashboardId}
+                  adminToken={adminToken}
                 />
               )}
             </div>
@@ -568,7 +611,102 @@ function HomeInner({
           {displayName} Now &middot; 已接入 {resolvedSnapshots.length} 个面板 &middot; 状态 10 秒刷新 / 时间线 30 秒刷新 &middot; (◕ᴗ◕)
         </p>
       </footer>
+      </div>
+
+      {shieldVisible && <ShieldOverlay onCloseShield={handleShieldClose} />}
     </>
+  );
+}
+
+function ShieldOverlay({
+  onCloseShield,
+}: {
+  onCloseShield: (password: string) => Promise<void>;
+}) {
+  const [showPassword, setShowPassword] = useState(false);
+  const [password, setPassword] = useState("");
+  const [closing, setClosing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.body.classList.add("shield-overlay-open");
+    return () => document.body.classList.remove("shield-overlay-open");
+  }, []);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!password.trim()) {
+      setError("请输入管理员密码");
+      return;
+    }
+
+    setClosing(true);
+    setError(null);
+    try {
+      await onCloseShield(password);
+    } catch (submitError) {
+      const message = submitError instanceof Error ? submitError.message : "验证失败";
+      setError(message === "Unauthorized" ? "管理员密码不正确" : `关闭失败：${message}`);
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  return (
+    <div className="shield-overlay" role="dialog" aria-modal="true" aria-labelledby="shield-title">
+      <div className="shield-noise" aria-hidden="true" />
+      <div className="shield-orbit shield-orbit-one" aria-hidden="true">✦　✧　✦</div>
+      <div className="shield-orbit shield-orbit-two" aria-hidden="true">×　×　×</div>
+
+      <div className="shield-warning-card">
+        <div className="shield-cat" aria-hidden="true">
+          <span className="shield-cat-ear shield-cat-ear-left" />
+          <span className="shield-cat-ear shield-cat-ear-right" />
+          <span className="shield-cat-face">ಠ ﻌ ಠ</span>
+        </div>
+        <p className="shield-kicker">PRIVACY PAWTOCOL / 403</p>
+        <h1 id="shield-title">目前已开启屏蔽状态</h1>
+        <p className="shield-message">猫猫不允许视奸</p>
+        <div className="shield-redacted" aria-label="状态数据已隐藏">
+          <span>STATUS</span>
+          <b>▓▓▓ ░▒▓ ████████ ▓▒░ ▓▓▓</b>
+        </div>
+        <p className="shield-footnote">实时状态已被猫爪加密 · 请尊重边界喵</p>
+      </div>
+
+      {showPassword && (
+        <form className="shield-password-card" onSubmit={handleSubmit}>
+          <label htmlFor="shield-admin-password">输入管理员密码以关闭屏蔽</label>
+          <div className="shield-password-row">
+            <input
+              id="shield-admin-password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoFocus
+              autoComplete="current-password"
+              placeholder="管理员密码"
+              disabled={closing}
+            />
+            <button type="submit" disabled={closing}>
+              {closing ? "验证中…" : "确认关闭"}
+            </button>
+          </div>
+          {error && <p className="shield-password-error">{error}</p>}
+        </form>
+      )}
+
+      <button
+        type="button"
+        className="shield-close-button"
+        onClick={() => {
+          setShowPassword((value) => !value);
+          setError(null);
+        }}
+      >
+        {showPassword ? "取消" : "关闭"}
+      </button>
+    </div>
   );
 }
 
@@ -661,6 +799,8 @@ function DashboardAdminPanel({
   onSaveDevice,
   onDeleteDevice,
   onReload,
+  shieldEnabled,
+  onShieldChange,
 }: {
   dashboards: DashboardProfile[];
   siteConfig: AdminSiteConfig;
@@ -681,6 +821,8 @@ function DashboardAdminPanel({
   }) => void;
   onDeleteDevice: (deviceId: string) => void;
   onReload: () => void;
+  shieldEnabled: boolean;
+  onShieldChange: (enabled: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   const [unlocked, setUnlocked] = useState(false);
@@ -817,6 +959,29 @@ function DashboardAdminPanel({
                 </button>
               </div>
 
+              <div className="shield-admin-control mb-3">
+                <div>
+                  <p className="text-sm font-bold text-[var(--color-text)]">访客屏蔽状态</p>
+                  <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                    开启后访客只会看到猫猫警告，实时数据由服务器替换为乱码。
+                  </p>
+                </div>
+                <label className="shield-switch">
+                  <input
+                    type="checkbox"
+                    checked={shieldEnabled}
+                    onChange={(event) => onShieldChange(event.target.checked)}
+                    aria-label="切换访客屏蔽状态"
+                  />
+                  <span className="shield-switch-track" aria-hidden="true">
+                    <span className="shield-switch-thumb">{shieldEnabled ? "×" : "猫"}</span>
+                  </span>
+                  <span className="text-xs font-bold">
+                    {shieldEnabled ? "已屏蔽" : "未屏蔽"}
+                  </span>
+                </label>
+              </div>
+
               <div className="grid gap-2 md:grid-cols-2">
                 <input
                   value={id}
@@ -909,6 +1074,7 @@ function DashboardAdminPanel({
                       displayName: siteDisplayName,
                       siteTitle,
                       siteDescription,
+                      shieldEnabled,
                     });
                   }}
                   className="pill-btn text-xs px-3 py-1"

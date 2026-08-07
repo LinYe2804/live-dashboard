@@ -13,6 +13,7 @@ const serverRenderConfig: SiteConfig = {
   siteFavicon: "/__LIVE_DASHBOARD_SITE_FAVICON__",
   dashboards: defaultConfig.dashboards,
   shieldEnabled: false,
+  shieldStatusText: defaultConfig.shieldStatusText,
 };
 
 function readDocumentValue(value: string | null | undefined, fallback: string): string {

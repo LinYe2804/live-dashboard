@@ -5,7 +5,11 @@ import {
   getAdminDeviceConfigs,
   upsertAdminDeviceConfig,
 } from "../middleware/auth";
-import { getSiteConfig, updateShieldEnabled } from "../services/site-config";
+import {
+  getSiteConfig,
+  updateShieldEnabled,
+  updateShieldStatusText,
+} from "../services/site-config";
 import { normalizeDashboardProfileInput } from "../services/site-config";
 import { updateSiteConfigFromAdmin } from "../services/site-config";
 
@@ -30,6 +34,7 @@ export function handleAdminConfigGet(req: Request): Response {
       siteTitle: site.siteTitle,
       siteDescription: site.siteDescription,
       shieldEnabled: site.shieldEnabled,
+      shieldStatusText: site.shieldStatusText,
     },
     devices: getAdminDeviceConfigs(),
   });
@@ -51,8 +56,16 @@ export async function handleAdminShieldUpdate(req: Request): Promise<Response> {
     return Response.json({ error: "enabled must be a boolean" }, { status: 400 });
   }
 
+  const statusText = (body as { statusText?: unknown })?.statusText;
+  if (statusText !== undefined && typeof statusText !== "string") {
+    return Response.json({ error: "statusText must be a string" }, { status: 400 });
+  }
+
   updateShieldEnabled(enabled);
-  return Response.json({ ok: true, shieldEnabled: enabled });
+  const shieldStatusText = typeof statusText === "string"
+    ? updateShieldStatusText(statusText)
+    : getSiteConfig().shieldStatusText;
+  return Response.json({ ok: true, shieldEnabled: enabled, shieldStatusText });
 }
 
 export async function handleAdminSiteUpdate(req: Request): Promise<Response> {
@@ -78,6 +91,7 @@ export async function handleAdminSiteUpdate(req: Request): Promise<Response> {
       siteTitle: site.siteTitle,
       siteDescription: site.siteDescription,
       shieldEnabled: site.shieldEnabled,
+      shieldStatusText: site.shieldStatusText,
     },
   });
 }

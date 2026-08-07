@@ -63,11 +63,16 @@ export default function Home() {
       siteTitle: site.siteTitle,
       siteDescription: site.siteDescription,
       shieldEnabled: site.shieldEnabled,
+      shieldStatusText: site.shieldStatusText,
     }));
   }, []);
 
-  const handleShieldUpdated = useCallback((shieldEnabled: boolean) => {
-    setRuntimeConfig((prev) => ({ ...prev, shieldEnabled }));
+  const handleShieldUpdated = useCallback((shieldEnabled: boolean, shieldStatusText?: string) => {
+    setRuntimeConfig((prev) => ({
+      ...prev,
+      shieldEnabled,
+      shieldStatusText: shieldStatusText ?? prev.shieldStatusText,
+    }));
   }, []);
 
   return (
@@ -86,7 +91,7 @@ function HomeInner({
   onShieldUpdated,
 }: {
   onSiteConfigUpdated: (site: AdminSiteConfig) => void;
-  onShieldUpdated: (enabled: boolean) => void;
+  onShieldUpdated: (enabled: boolean, statusText?: string) => void;
 }) {
   const config = useConfig();
   const { displayName } = config;
@@ -227,7 +232,7 @@ function HomeInner({
     }
   }, [adminToken]);
 
-  const handleShieldChange = useCallback(async (enabled: boolean) => {
+  const handleShieldChange = useCallback(async (enabled: boolean, statusText?: string) => {
     if (!adminToken.trim()) {
       setAdminStatus("请先填写管理密码");
       return;
@@ -235,9 +240,9 @@ function HomeInner({
 
     try {
       setAdminStatus(enabled ? "正在开启屏蔽状态..." : "正在关闭屏蔽状态...");
-      const nextEnabled = await updateShieldState(enabled, adminToken.trim());
-      onShieldUpdated(nextEnabled);
-      setAdminStatus(nextEnabled ? "屏蔽状态已开启，访客数据已替换为乱码" : "屏蔽状态已关闭");
+      const settings = await updateShieldState(enabled, adminToken.trim(), statusText);
+      onShieldUpdated(settings.shieldEnabled, settings.shieldStatusText);
+      setAdminStatus(settings.shieldEnabled ? "屏蔽状态已开启，访客数据已替换为乱码" : "屏蔽状态已关闭");
     } catch (error) {
       const message = error instanceof Error ? error.message : "请检查管理密码";
       setAdminStatus(`屏蔽状态更新失败：${message}`);
@@ -246,8 +251,8 @@ function HomeInner({
 
   const handleShieldClose = useCallback(async (password: string) => {
     const normalized = password.trim();
-    const nextEnabled = await updateShieldState(false, normalized);
-    onShieldUpdated(nextEnabled);
+    const settings = await updateShieldState(false, normalized);
+    onShieldUpdated(settings.shieldEnabled, settings.shieldStatusText);
   }, [onShieldUpdated]);
 
   const dashboards = useMemo<DashboardOption[]>(() => {
@@ -454,6 +459,7 @@ function HomeInner({
             siteTitle: config.siteTitle,
             siteDescription: config.siteDescription,
             shieldEnabled: config.shieldEnabled,
+            shieldStatusText: config.shieldStatusText,
           }}
           devices={adminDevices}
           adminToken={adminToken}
@@ -613,14 +619,21 @@ function HomeInner({
       </footer>
       </div>
 
-      {shieldVisible && <ShieldOverlay onCloseShield={handleShieldClose} />}
+      {shieldVisible && (
+        <ShieldOverlay
+          statusText={config.shieldStatusText}
+          onCloseShield={handleShieldClose}
+        />
+      )}
     </>
   );
 }
 
 function ShieldOverlay({
+  statusText,
   onCloseShield,
 }: {
+  statusText: string;
   onCloseShield: (password: string) => Promise<void>;
 }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -659,17 +672,13 @@ function ShieldOverlay({
       <div className="shield-orbit shield-orbit-two" aria-hidden="true">×　×　×</div>
 
       <div className="shield-warning-card">
-        <div className="shield-cat" aria-hidden="true">
-          <span className="shield-cat-ear shield-cat-ear-left" />
-          <span className="shield-cat-ear shield-cat-ear-right" />
-          <span className="shield-cat-face">ಠ ﻌ ಠ</span>
-        </div>
+        <div className="shield-glossy-x" aria-hidden="true">×</div>
         <p className="shield-kicker">PRIVACY PAWTOCOL / 403</p>
         <h1 id="shield-title">目前已开启屏蔽状态</h1>
         <p className="shield-message">猫猫不允许视奸</p>
         <div className="shield-redacted" aria-label="状态数据已隐藏">
           <span>STATUS</span>
-          <b>▓▓▓ ░▒▓ ████████ ▓▒░ ▓▓▓</b>
+          <b>{statusText}</b>
         </div>
         <p className="shield-footnote">实时状态已被猫爪加密 · 请尊重边界喵</p>
       </div>
@@ -822,7 +831,7 @@ function DashboardAdminPanel({
   onDeleteDevice: (deviceId: string) => void;
   onReload: () => void;
   shieldEnabled: boolean;
-  onShieldChange: (enabled: boolean) => void;
+  onShieldChange: (enabled: boolean, statusText?: string) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   const [unlocked, setUnlocked] = useState(false);
@@ -840,12 +849,14 @@ function DashboardAdminPanel({
   const [deviceId, setDeviceId] = useState("");
   const [deviceName, setDeviceName] = useState("");
   const [devicePlatform, setDevicePlatform] = useState<"windows" | "android" | "macos">("windows");
+  const [shieldStatusText, setShieldStatusText] = useState(siteConfig.shieldStatusText);
 
   useEffect(() => {
     setSiteDisplayName(siteConfig.displayName);
     setSiteTitle(siteConfig.siteTitle);
     setSiteDescription(siteConfig.siteDescription);
-  }, [siteConfig.displayName, siteConfig.siteDescription, siteConfig.siteTitle]);
+    setShieldStatusText(siteConfig.shieldStatusText);
+  }, [siteConfig.displayName, siteConfig.shieldStatusText, siteConfig.siteDescription, siteConfig.siteTitle]);
 
   const handleUnlock = async () => {
     const password = passwordInput.trim();
@@ -970,7 +981,7 @@ function DashboardAdminPanel({
                   <input
                     type="checkbox"
                     checked={shieldEnabled}
-                    onChange={(event) => onShieldChange(event.target.checked)}
+                    onChange={(event) => onShieldChange(event.target.checked, shieldStatusText)}
                     aria-label="切换访客屏蔽状态"
                   />
                   <span className="shield-switch-track" aria-hidden="true">
@@ -980,6 +991,21 @@ function DashboardAdminPanel({
                     {shieldEnabled ? "已屏蔽" : "未屏蔽"}
                   </span>
                 </label>
+                <div className="shield-status-editor">
+                  <input
+                    value={shieldStatusText}
+                    onChange={(event) => setShieldStatusText(event.target.value)}
+                    maxLength={160}
+                    placeholder="自定义 STATUS 内容"
+                    aria-label="自定义屏蔽状态内容"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onShieldChange(shieldEnabled, shieldStatusText)}
+                  >
+                    保存内容
+                  </button>
+                </div>
               </div>
 
               <div className="grid gap-2 md:grid-cols-2">
@@ -1075,6 +1101,7 @@ function DashboardAdminPanel({
                       siteTitle,
                       siteDescription,
                       shieldEnabled,
+                      shieldStatusText,
                     });
                   }}
                   className="pill-btn text-xs px-3 py-1"

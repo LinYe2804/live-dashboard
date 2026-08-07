@@ -13,6 +13,7 @@ export interface SiteConfig {
   siteFavicon: string;
   dashboards: DashboardProfile[];
   shieldEnabled: boolean;
+  shieldStatusText: string;
 }
 
 export interface DashboardProfile {
@@ -36,6 +37,8 @@ const RUNTIME_DISPLAY_NAME_KEY = "display_name";
 const RUNTIME_SITE_TITLE_KEY = "site_title";
 const RUNTIME_SITE_DESC_KEY = "site_description";
 const RUNTIME_SHIELD_ENABLED_KEY = "shield_enabled";
+const RUNTIME_SHIELD_STATUS_KEY = "shield_status_text";
+const DEFAULT_SHIELD_STATUS_TEXT = "▓▓▓ ░▒▓ ████████ ▓▒░ ▓▓▓";
 
 function nonEmpty(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
@@ -205,6 +208,8 @@ export function getSiteConfig(): SiteConfig {
     siteFavicon: isValidFaviconUrl(rawFavicon) ? rawFavicon : DEFAULT_FAVICON,
     dashboards: getDashboards(),
     shieldEnabled: runtimeSettings[RUNTIME_SHIELD_ENABLED_KEY] === "true",
+    shieldStatusText:
+      nonEmpty(runtimeSettings[RUNTIME_SHIELD_STATUS_KEY]) ?? DEFAULT_SHIELD_STATUS_TEXT,
   };
 }
 
@@ -215,6 +220,17 @@ export function isShieldEnabled(): boolean {
 export function updateShieldEnabled(enabled: boolean): boolean {
   upsertRuntimeSiteSetting(RUNTIME_SHIELD_ENABLED_KEY, enabled ? "true" : "false");
   return enabled;
+}
+
+export function updateShieldStatusText(value: string): string {
+  const normalized = value.trim().slice(0, 160);
+  if (!normalized) {
+    deleteRuntimeSiteSetting(RUNTIME_SHIELD_STATUS_KEY);
+    return DEFAULT_SHIELD_STATUS_TEXT;
+  }
+
+  upsertRuntimeSiteSetting(RUNTIME_SHIELD_STATUS_KEY, normalized);
+  return normalized;
 }
 
 function updateRuntimeStringSetting(

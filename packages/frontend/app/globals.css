@@ -697,41 +697,44 @@ body.night-mode .status-pointer::after {
   border-bottom: 5px solid;
 }
 
-.shield-cat {
+.shield-glossy-x {
   position: absolute;
-  top: -48px;
+  top: -70px;
   left: 50%;
-  width: 112px;
-  height: 92px;
+  width: 138px;
+  height: 138px;
   transform: translateX(-50%);
   display: grid;
   place-items: center;
-  border: 3px solid #ff7899;
-  border-radius: 50% 50% 43% 43%;
-  color: #3a1228;
-  background: #ffd2dc;
-  box-shadow: 0 10px 28px rgba(255, 93, 132, 0.35);
+  color: transparent;
+  background: linear-gradient(145deg, #fff4f6 2%, #ff7187 20%, #ed173a 48%, #9d001d 72%, #ff4663 90%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-stroke: 2px rgba(112, 0, 22, 0.58);
+  font-family: Arial Black, Arial, sans-serif;
+  font-size: 142px;
+  font-weight: 950;
+  line-height: 0.72;
+  text-shadow:
+    0 3px 0 rgba(255, 166, 178, 0.62),
+    0 11px 0 rgba(113, 0, 24, 0.76),
+    0 18px 32px rgba(255, 23, 67, 0.55);
+  filter: drop-shadow(0 8px 12px rgba(40, 0, 12, 0.46));
+  animation: shield-x-float 3.2s ease-in-out infinite;
 }
 
-.shield-cat-ear {
+.shield-glossy-x::after {
+  content: "";
   position: absolute;
-  top: -24px;
-  width: 42px;
-  height: 42px;
-  border: 3px solid #ff7899;
-  background: #ffd2dc;
-  transform: rotate(45deg);
-  z-index: -1;
-}
-
-.shield-cat-ear-left { left: 5px; }
-.shield-cat-ear-right { right: 5px; }
-
-.shield-cat-face {
-  margin-top: 4px;
-  font-size: 23px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  top: 29px;
+  left: 35px;
+  width: 52px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0));
+  transform: rotate(-43deg);
+  filter: blur(1px);
+  opacity: 0.9;
 }
 
 .shield-kicker {
@@ -775,8 +778,7 @@ body.night-mode .status-pointer::after {
 }
 
 .shield-redacted b {
-  overflow: hidden;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   animation: shield-redact 1.7s steps(2, end) infinite;
 }
 
@@ -853,7 +855,8 @@ body.night-mode .status-pointer::after {
 }
 
 .shield-admin-control {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
@@ -861,6 +864,36 @@ body.night-mode .status-pointer::after {
   border: 1px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
   border-radius: 14px;
   background: color-mix(in srgb, var(--color-primary) 8%, var(--color-card));
+}
+
+.shield-status-editor {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  width: 100%;
+}
+
+.shield-status-editor input,
+.shield-status-editor button {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 9px 11px;
+  color: var(--color-text);
+  background: var(--color-card);
+  font-size: 12px;
+}
+
+.shield-status-editor button {
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.shield-status-editor input:focus,
+.shield-status-editor button:hover {
+  border-color: var(--color-primary);
+  outline: none;
 }
 
 .shield-switch {
@@ -927,8 +960,14 @@ body.night-mode .status-pointer::after {
   50% { opacity: 1; transform: translateX(2px); }
 }
 
+@keyframes shield-x-float {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(-2deg); }
+  50% { transform: translateX(-50%) translateY(-10px) rotate(2deg); }
+}
+
 @media (max-width: 640px) {
-  .shield-admin-control { align-items: flex-start; flex-direction: column; }
+  .shield-admin-control { grid-template-columns: 1fr; }
+  .shield-status-editor { grid-template-columns: 1fr; }
   .shield-redacted { gap: 8px; font-size: 9px; }
   .shield-password-row { grid-template-columns: 1fr; }
 }

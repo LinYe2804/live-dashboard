@@ -27,6 +27,7 @@ export interface AdminSiteConfig {
   siteTitle: string;
   siteDescription: string;
   shieldEnabled: boolean;
+  shieldStatusText: string;
 }
 
 export interface AdminSiteConfigUpdate {
@@ -230,6 +231,7 @@ export interface SiteConfig {
   siteFavicon: string;
   dashboards: DashboardProfile[];
   shieldEnabled: boolean;
+  shieldStatusText: string;
 }
 
 const defaultConfig: SiteConfig = {
@@ -239,6 +241,7 @@ const defaultConfig: SiteConfig = {
   siteFavicon: "/favicon.ico",
   dashboards: [],
   shieldEnabled: false,
+  shieldStatusText: "▓▓▓ ░▒▓ ████████ ▓▒░ ▓▓▓",
 };
 
 export { defaultConfig };
@@ -297,6 +300,9 @@ export async function fetchConfig(
       siteFavicon: favicon,
       dashboards: dashboards.length > 0 ? dashboards : defaultConfig.dashboards,
       shieldEnabled: data.shieldEnabled === true,
+      shieldStatusText: typeof data.shieldStatusText === "string"
+        ? data.shieldStatusText
+        : defaultConfig.shieldStatusText,
     };
   } catch {
     return defaultConfig;
@@ -364,7 +370,8 @@ function normalizeAdminSiteConfig(value: unknown): AdminSiteConfig | null {
     typeof record.displayName !== "string" ||
     typeof record.siteTitle !== "string" ||
     typeof record.siteDescription !== "string" ||
-    typeof record.shieldEnabled !== "boolean"
+    typeof record.shieldEnabled !== "boolean" ||
+    typeof record.shieldStatusText !== "string"
   ) {
     return null;
   }
@@ -374,6 +381,7 @@ function normalizeAdminSiteConfig(value: unknown): AdminSiteConfig | null {
     siteTitle: record.siteTitle,
     siteDescription: record.siteDescription,
     shieldEnabled: record.shieldEnabled,
+    shieldStatusText: record.shieldStatusText,
   };
 }
 
@@ -496,20 +504,24 @@ export async function updateAdminSiteConfig(
 export async function updateShieldState(
   enabled: boolean,
   adminToken: string,
-): Promise<boolean> {
+  statusText?: string,
+): Promise<{ shieldEnabled: boolean; shieldStatusText: string }> {
   const res = await fetch(buildApiUrl("/api/config/shield"), {
     method: "POST",
     headers: buildAdminHeaders(adminToken),
-    body: JSON.stringify({ enabled }),
+    body: JSON.stringify({ enabled, ...(statusText === undefined ? {} : { statusText }) }),
     cache: "no-store",
   });
 
   if (!res.ok) throw new Error(await parseApiError(res));
-  const data = await res.json() as { shieldEnabled?: unknown };
-  if (typeof data.shieldEnabled !== "boolean") {
+  const data = await res.json() as { shieldEnabled?: unknown; shieldStatusText?: unknown };
+  if (typeof data.shieldEnabled !== "boolean" || typeof data.shieldStatusText !== "string") {
     throw new Error("Invalid shield config response");
   }
-  return data.shieldEnabled;
+  return {
+    shieldEnabled: data.shieldEnabled,
+    shieldStatusText: data.shieldStatusText,
+  };
 }
 
 export async function upsertAdminDeviceConfig(

@@ -20,6 +20,7 @@ __pycache__/
 build/
 *.zip
 packages/backend/public/
+packages/backend/admin-public/
 agents/android-app/local.properties
 
 agents/android-app/.gradle/

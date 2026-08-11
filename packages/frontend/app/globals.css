@@ -704,37 +704,39 @@ body.night-mode .status-pointer::after {
   width: 138px;
   height: 138px;
   transform: translateX(-50%);
-  display: grid;
-  place-items: center;
   color: transparent;
-  background: linear-gradient(145deg, #fff4f6 2%, #ff7187 20%, #ed173a 48%, #9d001d 72%, #ff4663 90%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-stroke: 2px rgba(112, 0, 22, 0.58);
-  font-family: Arial Black, Arial, sans-serif;
-  font-size: 142px;
-  font-weight: 950;
-  line-height: 0.72;
-  text-shadow:
-    0 3px 0 rgba(255, 166, 178, 0.62),
-    0 11px 0 rgba(113, 0, 24, 0.76),
-    0 18px 32px rgba(255, 23, 67, 0.55);
+  font-size: 0;
   filter: drop-shadow(0 8px 12px rgba(40, 0, 12, 0.46));
   animation: shield-x-float 3.2s ease-in-out infinite;
 }
 
+.shield-glossy-x::before,
 .shield-glossy-x::after {
   content: "";
   position: absolute;
-  top: 29px;
-  left: 35px;
-  width: 52px;
-  height: 12px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0));
-  transform: rotate(-43deg);
-  filter: blur(1px);
-  opacity: 0.9;
+  top: 50%;
+  left: 50%;
+  width: 124px;
+  height: 31px;
+  margin: -15.5px 0 0 -62px;
+  border: 2px solid rgba(112, 0, 22, 0.72);
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0 9%, transparent 24%),
+    linear-gradient(145deg, #ff7187 8%, #ed173a 45%, #9d001d 76%, #ff4663 100%);
+  box-shadow:
+    inset 0 3px 0 rgba(255, 190, 198, 0.62),
+    inset 0 -5px 0 rgba(94, 0, 20, 0.52),
+    0 7px 0 rgba(113, 0, 24, 0.78),
+    0 13px 24px rgba(255, 23, 67, 0.38);
+}
+
+.shield-glossy-x::before {
+  transform: rotate(45deg);
+}
+
+.shield-glossy-x::after {
+  transform: rotate(-45deg);
 }
 
 .shield-kicker {

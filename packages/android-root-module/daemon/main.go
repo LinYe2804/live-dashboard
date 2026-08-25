@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -77,13 +78,46 @@ type daemon struct {
 	wake            chan struct{}
 }
 
+// On Android 10+ root daemons cannot read the per-network netd DNS config,
+// so Go's pure resolver falls back to 127.0.0.1:53 where nothing listens.
+// Fall back to public resolvers, then the system-configured address.
+var dnsFallbacks = []string{
+	"223.5.5.5:53",
+	"119.29.29.29:53",
+	"8.8.8.8:53",
+}
+
+func newHTTPClient() *http.Client {
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			dialer := &net.Dialer{Timeout: 5 * time.Second}
+			var lastErr error
+			for _, server := range append(dnsFallbacks, address) {
+				conn, err := dialer.DialContext(ctx, network, server)
+				if err == nil {
+					return conn, nil
+				}
+				lastErr = err
+			}
+			return nil, lastErr
+		},
+	}
+	return &http.Client{
+		Timeout: 20 * time.Second,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{Timeout: 10 * time.Second, Resolver: resolver}).DialContext,
+		},
+	}
+}
+
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.LUTC)
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		log.Fatal(err)
 	}
 	d := &daemon{
-		httpClient: &http.Client{Timeout: 20 * time.Second},
+		httpClient: newHTTPClient(),
 		wake:       make(chan struct{}, 1),
 	}
 	d.reloadConfig()

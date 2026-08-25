@@ -843,7 +843,7 @@ function DashboardLoadingSkeleton() {
       <div className="loading-welcome glass-panel">
         <div className="loading-emblem" aria-hidden="true">
           <span className="loading-emblem-ring" />
-          <span className="loading-emblem-face">猫</span>
+          <span className="loading-emblem-face" />
           <span className="loading-emblem-spark loading-emblem-spark-one" />
           <span className="loading-emblem-spark loading-emblem-spark-two" />
         </div>
@@ -1147,7 +1147,7 @@ function DashboardAdminPanel({
                     aria-label="切换访客屏蔽状态"
                   />
                   <span className="shield-switch-track" aria-hidden="true">
-                    <span className="shield-switch-thumb">{shieldEnabled ? "×" : "猫"}</span>
+                    <span className="shield-switch-thumb">{shieldEnabled ? "×" : null}</span>
                   </span>
                   <span className="text-xs font-bold">
                     {shieldEnabled ? "已屏蔽" : "未屏蔽"}

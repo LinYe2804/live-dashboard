@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">实时看板 · 小米健康桥接</string>
-    <string name="module_description">仅允许实时看板助手只读访问小米运动健康的数据提供器</string>
-</resources>

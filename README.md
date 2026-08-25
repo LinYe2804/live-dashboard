@@ -19,8 +19,13 @@
 |---|---|---|
 | Windows | https://github.com/nmb1337/live-dashboard/releases/latest/download/live-dashboard-windows-agent-win-x64.zip | 你的 Windows App 链接 |
 | macOS | https://github.com/Monika-Dream/live-dashboard/releases | 原作者链接 |
-| Android | https://github.com/LinYe2804/live-dashboard/releases/latest/download/live-dashboard-android-agent.apk | 实时看板助手 |
-| Android（LSPosed） | https://github.com/LinYe2804/live-dashboard/releases/latest/download/live-dashboard-xiaomi-health-lsposed.apk | 小米运动健康只读桥接模块 |
+| Android（配置 + LSPosed） | https://github.com/LinYe2804/live-dashboard/releases/latest/download/live-dashboard-android-agent.apk | 合并的配置界面、系统框架与小米健康钩子 |
+| Android（KernelSU） | https://github.com/LinYe2804/live-dashboard/releases/latest/download/live-dashboard-kernelsu-module.zip | 轻量常驻上报、离线队列与开机启动模块 |
+
+Android 2.0 不再依赖前台服务、使用情况访问或通知读取权限。先在 KernelSU
+中安装 ZIP，再安装 APK 并授予其 Root 权限；在 LSPosed 中启用 APK，作用域
+勾选“系统框架”和“小米运动健康”，保存配置后重启一次即可。配置应用可以随时
+从最近任务划掉，上报由 KernelSU 守护进程继续执行。
 
 ---
 

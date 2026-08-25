@@ -33,3 +33,6 @@ packages/android-agent/local.properties
 packages/android-agent/**/build/
 packages/android-agent/*.keystore
 *.hprof
+# Locally cross-compiled KernelSU payload (CI rebuilds it from Go source)
+packages/android-root-module/module/bin/live-dashboard-daemon
+packages/android-root-module/dist/

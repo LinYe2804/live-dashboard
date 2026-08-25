@@ -20,8 +20,8 @@ android {
         applicationId = "com.monika.livedashboard.agent"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.1.0"
+        versionCode = 5
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -77,6 +77,7 @@ android {
 }
 
 dependencies {
+    compileOnly("de.robv.android.xposed:api:82")
     implementation(platform("androidx.compose:compose-bom:2024.09.03"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -86,10 +87,6 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
-    implementation("androidx.lifecycle:lifecycle-service:2.8.6")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

@@ -78,6 +78,10 @@ jobs:
           java-version: '17'
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -123,10 +127,22 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [[ "${{ steps.signing_mode.outputs.mode }}" == "release" ]]; then
-            gradle -q :app:assembleRelease :xiaomi-health-bridge:assembleRelease
+            gradle -q :app:assembleRelease
           else
-            gradle -q :app:assembleDebug :xiaomi-health-bridge:assembleDebug
+            gradle -q :app:assembleDebug
           fi
+      - name: Build KernelSU root module
+        env:
+          CGO_ENABLED: '0'
+          GOOS: android
+          GOARCH: arm64
+        run: |
+          mkdir -p packages/android-root-module/module/bin
+          cd packages/android-root-module/daemon
+          go test ./...
+          go build -trimpath -ldflags='-s -w' -o ../module/bin/live-dashboard-daemon .
+          cd ../module
+          zip -9 -r ../../../live-dashboard-kernelsu-module.zip .
       - name: Prepare APK artifact
         run: |
           if [[ "${{ steps.signing_mode.outputs.mode }}" == "release" ]]; then
@@ -141,22 +157,12 @@ jobs:
             exit 1
           fi
           cp "$APK_PATH" live-dashboard-android-agent.apk
-          if [[ "${{ steps.signing_mode.outputs.mode }}" == "release" ]]; then
-            BRIDGE_APK=$(find packages/android-agent/xiaomi-health-bridge/build/outputs/apk/release -maxdepth 1 -type f -name "*release*.apk" | head -n 1)
-          else
-            BRIDGE_APK=$(find packages/android-agent/xiaomi-health-bridge/build/outputs/apk/debug -maxdepth 1 -type f -name "*.apk" | head -n 1)
-          fi
-          if [ -z "$BRIDGE_APK" ]; then
-            echo "No Xiaomi Health bridge APK found"
-            exit 1
-          fi
-          cp "$BRIDGE_APK" live-dashboard-xiaomi-health-lsposed.apk
       - uses: actions/upload-artifact@v4
         with:
           name: android-agent
           path: |
             live-dashboard-android-agent.apk
-            live-dashboard-xiaomi-health-lsposed.apk
+            live-dashboard-kernelsu-module.zip
 
   build-windows:
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
@@ -227,11 +233,11 @@ jobs:
       - name: Prepare release assets
         run: |
           mv android-agent/live-dashboard-android-agent.apk .
-          mv android-agent/live-dashboard-xiaomi-health-lsposed.apk .
+          mv android-agent/live-dashboard-kernelsu-module.zip .
           cp windows-agent/*.zip .
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             live-dashboard-android-agent.apk
-            live-dashboard-xiaomi-health-lsposed.apk
+            live-dashboard-kernelsu-module.zip
             live-dashboard-windows-agent-*.zip

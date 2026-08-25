@@ -1,17 +1,8 @@
 package com.monika.livedashboard.agent
 
-import android.Manifest
-import android.content.ComponentName
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -44,26 +35,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import java.net.URI
 
 class MainActivity : ComponentActivity() {
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) {}
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val granted = ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!granted) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
 
         val settingsStore = SettingsStore(this)
 
@@ -90,7 +66,6 @@ private fun AgentScreen(settingsStore: SettingsStore) {
     var reportActivity by rememberSaveable { mutableStateOf(initial.reportActivity) }
     var reportBattery by rememberSaveable { mutableStateOf(initial.reportBattery) }
     var reportHealth by rememberSaveable { mutableStateOf(initial.reportHealth) }
-    var autoStartOnBoot by rememberSaveable { mutableStateOf(initial.autoStartOnBoot) }
     var tokenVisible by rememberSaveable { mutableStateOf(false) }
     var runningEnabled by rememberSaveable { mutableStateOf(initial.isRunningEnabled) }
     var customRules by remember { mutableStateOf(initial.customRules) }
@@ -104,10 +79,6 @@ private fun AgentScreen(settingsStore: SettingsStore) {
         logs = settingsStore.loadLogs(80)
     }
 
-    val usagePermissionGranted = UsageTracker.hasUsageStatsPermission(context)
-    val notificationAccessGranted = hasNotificationAccess(context)
-    val batteryOptimizationIgnored = isIgnoringBatteryOptimizations(context)
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -115,9 +86,9 @@ private fun AgentScreen(settingsStore: SettingsStore) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("实时看板助手", style = MaterialTheme.typography.headlineSmall)
+        Text("实时看板 Root 模块", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "持续上报设备活动、听歌状态与小米运动健康数据。",
+            "配置 LSPosed 系统钩子与 KernelSU 轻量守护进程；关闭此界面后仍可持续上报。",
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -129,10 +100,9 @@ private fun AgentScreen(settingsStore: SettingsStore) {
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text("运行状态", style = MaterialTheme.typography.titleMedium)
-                Text(if (runningEnabled) "监听状态：运行中" else "监听状态：未运行")
-                Text(if (usagePermissionGranted) "使用情况访问：已授权" else "使用情况访问：未授权")
-                Text(if (notificationAccessGranted) "通知读取权限（音乐识别）：已授权" else "通知读取权限（音乐识别）：未授权")
-                Text(if (batteryOptimizationIgnored) "电池优化：已加入白名单" else "电池优化：未加入白名单")
+                Text(if (runningEnabled) "Root 上报：已启用" else "Root 上报：未启用")
+                Text("LSPosed 作用域：系统框架（android）+ 小米运动健康")
+                Text("无需使用情况权限、通知读取权限或电池白名单")
                 Text("状态：$statusText")
             }
         }
@@ -213,8 +183,8 @@ private fun AgentScreen(settingsStore: SettingsStore) {
                 ) {
                     Text("小米健康桥接", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        if (XiaomiHealthCollector.isXiaomiHealthInstalled(context)) {
-                            "已检测到小米运动健康。还需安装配套 LSPosed 模块，并在 LSPosed 中将作用域勾选为“小米运动健康”。"
+                        if (isXiaomiHealthInstalled(context)) {
+                            "已检测到小米运动健康。当前 APK 已内置采集钩子，请在 LSPosed 中勾选“小米运动健康”和“系统框架”两个作用域。"
                         } else {
                             "未检测到小米运动健康（com.mi.health）。"
                         },
@@ -224,13 +194,7 @@ private fun AgentScreen(settingsStore: SettingsStore) {
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("开机自启")
-            Switch(checked = autoStartOnBoot, onCheckedChange = { autoStartOnBoot = it })
-        }
+        Text("KernelSU 守护进程随系统启动；是否上报由上方的 Root 上报开关控制。")
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -328,38 +292,12 @@ private fun AgentScreen(settingsStore: SettingsStore) {
         }
 
         HorizontalDivider()
-        Text("权限与系统设置", style = MaterialTheme.typography.titleMedium)
+        Text("模块状态", style = MaterialTheme.typography.titleMedium)
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                UsageTracker.openUsageAccessSettings(context)
-                statusText = "已打开使用情况访问权限页。"
-            }) {
-                Text("使用情况权限")
-            }
-
-            Button(onClick = {
-                openNotificationAccessSettings(context)
-                statusText = "已打开通知读取权限页。"
-            }) {
-                Text("通知读取权限")
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                requestIgnoreBatteryOptimizations(context)
-                statusText = "已打开电池优化设置页。"
-            }) {
-                Text("电池白名单")
-            }
-
-            Button(onClick = {
-                refreshLogs()
-                statusText = "状态已刷新。"
-            }) {
-                Text("刷新状态")
-            }
+        Button(onClick = {
+            statusText = RootDaemonConfig.readStatus()
+        }) {
+            Text("读取 KernelSU 守护进程状态")
         }
 
         HorizontalDivider()
@@ -383,8 +321,7 @@ private fun AgentScreen(settingsStore: SettingsStore) {
                         return@Button
                     }
 
-                    settingsStore.save(
-                        AgentSettings(
+                    val saved = AgentSettings(
                             serverUrl = normalizedServer,
                             token = token.trim(),
                             heartbeatSeconds = heartbeat,
@@ -392,13 +329,17 @@ private fun AgentScreen(settingsStore: SettingsStore) {
                             reportActivity = reportActivity,
                             reportBattery = reportBattery,
                             reportHealth = reportHealth,
-                            autoStartOnBoot = autoStartOnBoot,
+                            autoStartOnBoot = true,
                             isRunningEnabled = runningEnabled,
                             customRules = customRules,
                         )
+                    settingsStore.save(saved)
+                    val result = RootDaemonConfig.sync(saved)
+                    statusText = result.fold(
+                        onSuccess = { "设置已同步到 KernelSU 守护进程。" },
+                        onFailure = { "本地设置已保存，但 Root 同步失败：${it.message}" },
                     )
-                    statusText = "设置已保存。"
-                    settingsStore.appendLog("设置已保存")
+                    settingsStore.appendLog(statusText)
                     refreshLogs()
                 }
             ) {
@@ -419,13 +360,6 @@ private fun AgentScreen(settingsStore: SettingsStore) {
                         refreshLogs()
                         return@Button
                     }
-                    if (reportActivity && !UsageTracker.hasUsageStatsPermission(context)) {
-                        statusText = "请先授予使用情况访问权限。"
-                        settingsStore.appendLog("启动失败：未授予使用情况访问权限")
-                        refreshLogs()
-                        return@Button
-                    }
-
                     val heartbeat = heartbeatText.toIntOrNull()?.coerceIn(10, 50) ?: 30
                     val normalizedServer = serverUrl.trim().trimEnd('/')
                     if (!isServerUrlAllowed(normalizedServer) || token.trim().isBlank()) {
@@ -435,8 +369,7 @@ private fun AgentScreen(settingsStore: SettingsStore) {
                         return@Button
                     }
 
-                    settingsStore.save(
-                        AgentSettings(
+                    val started = AgentSettings(
                             serverUrl = normalizedServer,
                             token = token.trim(),
                             heartbeatSeconds = heartbeat,
@@ -444,19 +377,18 @@ private fun AgentScreen(settingsStore: SettingsStore) {
                             reportActivity = reportActivity,
                             reportBattery = reportBattery,
                             reportHealth = reportHealth,
-                            autoStartOnBoot = autoStartOnBoot,
+                            autoStartOnBoot = true,
                             isRunningEnabled = true,
                             customRules = customRules,
                         )
+                    settingsStore.save(started)
+                    val result = RootDaemonConfig.sync(started)
+                    if (result.isSuccess) runningEnabled = true
+                    statusText = result.fold(
+                        onSuccess = { "Root 上报已启用；助手界面可以直接关闭。" },
+                        onFailure = { "启用失败：${it.message}" },
                     )
-                    runningEnabled = true
-
-                    val serviceIntent = Intent(context, TrackingService::class.java).apply {
-                        action = TrackingService.ACTION_START
-                    }
-                    ContextCompat.startForegroundService(context, serviceIntent)
-                    statusText = "监听已启动。"
-                    settingsStore.appendLog("监听已启动")
+                    settingsStore.appendLog(statusText)
                     refreshLogs()
                 }
             ) {
@@ -465,14 +397,15 @@ private fun AgentScreen(settingsStore: SettingsStore) {
 
             Button(
                 onClick = {
-                    settingsStore.setRunningEnabled(false)
-                    runningEnabled = false
-                    val serviceIntent = Intent(context, TrackingService::class.java).apply {
-                        action = TrackingService.ACTION_STOP
-                    }
-                    context.startService(serviceIntent)
-                    statusText = "监听已停止。"
-                    settingsStore.appendLog("监听已停止")
+                    val stopped = settingsStore.load().copy(isRunningEnabled = false)
+                    settingsStore.save(stopped)
+                    val result = RootDaemonConfig.sync(stopped)
+                    if (result.isSuccess) runningEnabled = false
+                    statusText = result.fold(
+                        onSuccess = { "Root 上报已停止。" },
+                        onFailure = { "停止失败：${it.message}" },
+                    )
+                    settingsStore.appendLog(statusText)
                     refreshLogs()
                 }
             ) {
@@ -536,39 +469,5 @@ private fun isServerUrlAllowed(value: String): Boolean {
     }
 }
 
-private fun hasNotificationAccess(context: android.content.Context): Boolean {
-    val enabled = Settings.Secure.getString(
-        context.contentResolver,
-        "enabled_notification_listeners"
-    ) ?: return false
-
-    return enabled.split(':').any { flattened ->
-        ComponentName.unflattenFromString(flattened)?.packageName == context.packageName
-    }
-}
-
-private fun openNotificationAccessSettings(context: android.content.Context) {
-    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    context.startActivity(intent)
-}
-
-private fun isIgnoringBatteryOptimizations(context: android.content.Context): Boolean {
-    val powerManager = context.getSystemService(PowerManager::class.java)
-    return powerManager.isIgnoringBatteryOptimizations(context.packageName)
-}
-
-private fun requestIgnoreBatteryOptimizations(context: android.content.Context) {
-    val directIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-        data = Uri.parse("package:${context.packageName}")
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-
-    runCatching {
-        context.startActivity(directIntent)
-    }.getOrElse {
-        val fallbackIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(fallbackIntent)
-    }
-}
+private fun isXiaomiHealthInstalled(context: android.content.Context): Boolean =
+    context.packageManager.resolveContentProvider("com.mi.health.provider.main", 0) != null

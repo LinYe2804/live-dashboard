@@ -17,4 +17,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "live-dashboard-android-agent"
 include(":app")
-include(":xiaomi-health-bridge")

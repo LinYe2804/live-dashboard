@@ -1,0 +1,3 @@
+# LSPosed hooks only enqueue local JSON events. HTTPS remains in the root daemon.
+allow system_server ksu unix_stream_socket connectto;
+allow platform_app ksu unix_stream_socket connectto;

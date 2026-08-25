@@ -1,0 +1,6 @@
+id=live_dashboard_root
+name=Live Dashboard Root Reporter
+version=1.0.0
+versionCode=100
+author=LinYe2804
+description=Low-memory KernelSU reporter daemon for the Live Dashboard LSPosed module.

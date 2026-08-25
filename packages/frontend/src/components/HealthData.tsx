@@ -11,7 +11,8 @@ const TYPE_META: Record<string, { label: string; icon: string; priority: number 
   steps:                  { label: "步数",     icon: "🚶", priority: 3 },
   active_calories:        { label: "活动卡路里", icon: "🔥", priority: 4 },
   sleep:                  { label: "睡眠",     icon: "😴", priority: 5 },
-  weight:                 { label: "体重",     icon: "⚖",  priority: 6 },
+  sleep_state:            { label: "当前状态", icon: "🌙", priority: 6 },
+  weight:                 { label: "体重",     icon: "⚖",  priority: 7 },
   body_temperature:       { label: "体温",     icon: "🌡",  priority: 7 },
   blood_pressure:         { label: "血压",     icon: "🩺", priority: 8 },
   resting_heart_rate:     { label: "静息心率",  icon: "💚", priority: 9 },
@@ -205,6 +206,7 @@ export default function HealthData({ selectedDate, deviceId, dashboardId, adminT
 }
 
 function formatValue(value: number, type: string): string {
+  if (type === "sleep_state") return value >= 0.5 ? "睡眠中" : "清醒";
   if (type === "sleep" || type === "exercise") {
     const h = Math.floor(value / 60);
     const m = Math.round(value % 60);

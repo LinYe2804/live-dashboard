@@ -5,7 +5,7 @@ import type { HealthRecord } from "../types";
 const MAX_RECORDS_PER_REQUEST = 500;
 const VALID_TYPES = new Set([
   "heart_rate", "resting_heart_rate", "heart_rate_variability",
-  "steps", "distance", "exercise", "sleep",
+  "steps", "distance", "exercise", "sleep", "sleep_state",
   "oxygen_saturation", "body_temperature", "respiratory_rate",
   "blood_pressure", "blood_glucose",
   "weight", "height",

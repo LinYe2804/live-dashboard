@@ -29,13 +29,19 @@ object ApiReporter {
         val scopes = JSONArray().apply {
             if (settings.reportActivity) put("usage_stats")
             if (settings.reportBattery) put("battery")
+            if (settings.reportHealth) {
+                put("xiaomi_health")
+                put("sleep")
+                put("heart_rate")
+                put("steps")
+            }
             put("network_state")
         }
 
         val body = JSONObject()
             .put("consent_version", 1)
             .put("activity_reporting", settings.reportActivity)
-            .put("health_reporting", false)
+            .put("health_reporting", settings.reportHealth)
             .put("granted_scopes", scopes)
 
         val request = Request.Builder()
@@ -43,6 +49,36 @@ object ApiReporter {
             .addHeader("Authorization", "Bearer ${settings.token}")
             .addHeader("User-Agent", "live-dashboard-android-agent/1.0.0")
             .post(body.toString().toRequestBody(jsonMediaType))
+            .build()
+
+        return execute(request)
+    }
+
+    fun postHealthRecords(
+        settings: AgentSettings,
+        records: List<HealthRecordPayload>,
+    ): Boolean {
+        val baseUrl = normalizeBaseUrl(settings.serverUrl) ?: return false
+        if (settings.token.isBlank() || !settings.reportHealth || records.isEmpty()) return false
+
+        val recordsJson = JSONArray()
+        records.take(500).forEach { record ->
+            val item = JSONObject()
+                .put("type", record.type)
+                .put("value", record.value)
+                .put("unit", record.unit.take(20))
+                .put("timestamp", Instant.ofEpochMilli(record.timestampMs).toString())
+            record.endTimeMs?.let {
+                item.put("end_time", Instant.ofEpochMilli(it).toString())
+            }
+            recordsJson.put(item)
+        }
+
+        val request = Request.Builder()
+            .url("$baseUrl/api/health-data")
+            .addHeader("Authorization", "Bearer ${settings.token}")
+            .addHeader("User-Agent", "live-dashboard-android-agent/1.1.0")
+            .post(JSONObject().put("records", recordsJson).toString().toRequestBody(jsonMediaType))
             .build()
 
         return execute(request)

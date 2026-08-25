@@ -19,7 +19,8 @@
 |---|---|---|
 | Windows | https://github.com/nmb1337/live-dashboard/releases/latest/download/live-dashboard-windows-agent-win-x64.zip | 你的 Windows App 链接 |
 | macOS | https://github.com/Monika-Dream/live-dashboard/releases | 原作者链接 |
-| Android | https://github.com/nmb1337/live-dashboard/releases/latest/download/live-dashboard-android-agent.apk | 你的 Android App 链接 |
+| Android | https://github.com/LinYe2804/live-dashboard/releases/latest/download/live-dashboard-android-agent.apk | 实时看板助手 |
+| Android（LSPosed） | https://github.com/LinYe2804/live-dashboard/releases/latest/download/live-dashboard-xiaomi-health-lsposed.apk | 小米运动健康只读桥接模块 |
 
 ---
 

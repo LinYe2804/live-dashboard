@@ -11,8 +11,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven("https://api.xposed.info/")
     }
 }
 
 rootProject.name = "live-dashboard-android-agent"
 include(":app")
+include(":xiaomi-health-bridge")

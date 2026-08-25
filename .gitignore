@@ -28,4 +28,8 @@ agents/android-app/app/build/
 agents/android-app/build/
 agents/android-app/keystore.properties
 agents/android-app/*.keystore
+packages/android-agent/.gradle/
+packages/android-agent/local.properties
+packages/android-agent/**/build/
+packages/android-agent/*.keystore
 *.hprof

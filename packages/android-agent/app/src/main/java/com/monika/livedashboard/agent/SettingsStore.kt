@@ -19,6 +19,7 @@ class SettingsStore(context: Context) {
             consentGiven = prefs.getBoolean(KEY_CONSENT_GIVEN, false),
             reportActivity = prefs.getBoolean(KEY_REPORT_ACTIVITY, true),
             reportBattery = prefs.getBoolean(KEY_REPORT_BATTERY, true),
+            reportHealth = prefs.getBoolean(KEY_REPORT_HEALTH, false),
             autoStartOnBoot = prefs.getBoolean(KEY_AUTO_START, false),
             isRunningEnabled = prefs.getBoolean(KEY_RUNNING_ENABLED, false),
             customRules = readCustomRules(),
@@ -33,6 +34,7 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_CONSENT_GIVEN, settings.consentGiven)
             .putBoolean(KEY_REPORT_ACTIVITY, settings.reportActivity)
             .putBoolean(KEY_REPORT_BATTERY, settings.reportBattery)
+            .putBoolean(KEY_REPORT_HEALTH, settings.reportHealth)
             .putBoolean(KEY_AUTO_START, settings.autoStartOnBoot)
             .putBoolean(KEY_RUNNING_ENABLED, settings.isRunningEnabled)
                 .putString(KEY_CUSTOM_RULES, writeCustomRules(settings.customRules).toString())
@@ -141,6 +143,7 @@ class SettingsStore(context: Context) {
         private const val KEY_CONSENT_GIVEN = "consent_given"
         private const val KEY_REPORT_ACTIVITY = "report_activity"
         private const val KEY_REPORT_BATTERY = "report_battery"
+        private const val KEY_REPORT_HEALTH = "report_health"
         private const val KEY_AUTO_START = "auto_start"
         private const val KEY_RUNNING_ENABLED = "running_enabled"
         private const val KEY_CUSTOM_RULES = "custom_rules"

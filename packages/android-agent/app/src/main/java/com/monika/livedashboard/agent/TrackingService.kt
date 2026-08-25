@@ -26,9 +26,14 @@ class TrackingService : Service() {
 
     private var trackingJob: Job? = null
     private var consentUploaded = false
+    private var lastConsentKey = ""
     private var lastSentKey = ""
     private var lastSuccessfulReportAt = 0L
     private var lastNotificationText = ""
+    private val sentHistoricalHealthKeys = LinkedHashSet<String>()
+    private val lastHealthValueByType = mutableMapOf<String, String>()
+    private var lastHealthStateUploadAt = 0L
+    private var lastHealthBridgeError = ""
 
     override fun onCreate() {
         super.onCreate()
@@ -97,27 +102,42 @@ class TrackingService : Service() {
                     continue
                 }
 
-                if (!settings.consentGiven || !settings.reportActivity) {
+                if (!settings.consentGiven || (!settings.reportActivity && !settings.reportHealth)) {
                     setServiceState("需要先同意授权")
                     delay(5_000)
                     continue
                 }
 
-                if (!UsageTracker.hasUsageStatsPermission(this@TrackingService)) {
-                    setServiceState("未授予使用情况访问权限")
-                    delay(5_000)
-                    continue
+                val consentKey = "${settings.consentGiven}|${settings.reportActivity}|${settings.reportBattery}|${settings.reportHealth}"
+                if (consentKey != lastConsentKey) {
+                    consentUploaded = false
                 }
-
                 if (!consentUploaded) {
                     consentUploaded = ApiReporter.postConsent(settings)
                     if (consentUploaded) {
+                        lastConsentKey = consentKey
                         settingsStore.appendLog("同意状态上传成功")
                     } else {
                         setServiceState("同意状态上传失败，重试中")
                         delay(5_000)
                         continue
                     }
+                }
+
+                if (settings.reportHealth) {
+                    reportXiaomiHealth(settings)
+                }
+
+                if (!settings.reportActivity) {
+                    setServiceState("正在上报小米健康数据")
+                    delay(settings.heartbeatSeconds * 1_000L)
+                    continue
+                }
+
+                if (!UsageTracker.hasUsageStatsPermission(this@TrackingService)) {
+                    setServiceState("健康数据正常；未授予使用情况访问权限")
+                    delay(5_000)
+                    continue
                 }
 
                 val appInfo = UsageTracker.currentForegroundApp(this@TrackingService)
@@ -172,9 +192,14 @@ class TrackingService : Service() {
         trackingJob?.cancel()
         trackingJob = null
         consentUploaded = false
+        lastConsentKey = ""
         lastSentKey = ""
         lastSuccessfulReportAt = 0L
         lastNotificationText = ""
+        sentHistoricalHealthKeys.clear()
+        lastHealthValueByType.clear()
+        lastHealthStateUploadAt = 0L
+        lastHealthBridgeError = ""
         if (cancelWatchdog) {
             cancelWatchdog()
         }
@@ -187,6 +212,66 @@ class TrackingService : Service() {
         lastNotificationText = text
         updateNotificationNow(text)
         settingsStore.appendLog(logText)
+    }
+
+    private fun reportXiaomiHealth(settings: AgentSettings) {
+        val snapshot = XiaomiHealthCollector.collect(this)
+        if (!snapshot.bridgeReady) {
+            val error = snapshot.error.orEmpty()
+            if (error != lastHealthBridgeError) {
+                lastHealthBridgeError = error
+                settingsStore.appendLog("小米健康读取不可用：$error")
+            }
+            return
+        }
+
+        val sourceWarning = snapshot.error.orEmpty()
+        if (sourceWarning.isNotEmpty() && sourceWarning != lastHealthBridgeError) {
+            lastHealthBridgeError = sourceWarning
+            settingsStore.appendLog("小米健康部分数据暂不可用：$sourceWarning")
+        } else if (sourceWarning.isEmpty() && lastHealthBridgeError.isNotEmpty()) {
+            settingsStore.appendLog("小米健康 LSPosed 桥接已连接")
+            lastHealthBridgeError = ""
+        }
+
+        val now = System.currentTimeMillis()
+        val forceState = now - lastHealthStateUploadAt >= HEALTH_STATE_HEARTBEAT_MS
+        val pending = snapshot.records.filter { record ->
+            if (record.type == "sleep") {
+                record.dedupKey() !in sentHistoricalHealthKeys
+            } else {
+                val valueKey = "${record.value}|${record.unit}" +
+                    if (record.type == "heart_rate") "|${record.timestampMs}" else ""
+                lastHealthValueByType[record.type] != valueKey ||
+                    (record.type == "sleep_state" && forceState)
+            }
+        }
+        if (pending.isEmpty()) return
+
+        if (ApiReporter.postHealthRecords(settings, pending)) {
+            pending.forEach { record ->
+                if (record.type == "sleep") {
+                    sentHistoricalHealthKeys += record.dedupKey()
+                    while (sentHistoricalHealthKeys.size > MAX_HEALTH_HISTORY_KEYS) {
+                        sentHistoricalHealthKeys.remove(sentHistoricalHealthKeys.first())
+                    }
+                } else {
+                    lastHealthValueByType[record.type] = "${record.value}|${record.unit}" +
+                        if (record.type == "heart_rate") "|${record.timestampMs}" else ""
+                }
+            }
+            if (pending.any { it.type == "sleep_state" }) {
+                lastHealthStateUploadAt = now
+            }
+            val sleepLabel = when (snapshot.maybeSleeping) {
+                true -> "睡眠中"
+                false -> "清醒"
+                null -> "未知"
+            }
+            settingsStore.appendLog("健康数据上报成功：${pending.size} 条，当前$sleepLabel")
+        } else {
+            settingsStore.appendLog("健康数据上报失败，稍后重试")
+        }
     }
 
     private fun buildReportStatus(appInfo: ForegroundAppInfo, extras: DeviceExtras): String {
@@ -270,5 +355,7 @@ class TrackingService : Service() {
         private const val NOTIFICATION_ID = 11031
         private const val DEFAULT_WATCHDOG_DELAY_MS = 120_000L
         private const val FORCE_REPORT_INTERVAL_MS = 50_000L
+        private const val HEALTH_STATE_HEARTBEAT_MS = 5 * 60_000L
+        private const val MAX_HEALTH_HISTORY_KEYS = 64
     }
 }

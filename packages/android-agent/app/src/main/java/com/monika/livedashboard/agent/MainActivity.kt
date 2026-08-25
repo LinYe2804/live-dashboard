@@ -89,6 +89,7 @@ private fun AgentScreen(settingsStore: SettingsStore) {
     var consentGiven by rememberSaveable { mutableStateOf(initial.consentGiven) }
     var reportActivity by rememberSaveable { mutableStateOf(initial.reportActivity) }
     var reportBattery by rememberSaveable { mutableStateOf(initial.reportBattery) }
+    var reportHealth by rememberSaveable { mutableStateOf(initial.reportHealth) }
     var autoStartOnBoot by rememberSaveable { mutableStateOf(initial.autoStartOnBoot) }
     var tokenVisible by rememberSaveable { mutableStateOf(false) }
     var runningEnabled by rememberSaveable { mutableStateOf(initial.isRunningEnabled) }
@@ -116,7 +117,7 @@ private fun AgentScreen(settingsStore: SettingsStore) {
     ) {
         Text("实时看板助手", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "更稳定地持续上报设备活动，并支持显示听歌状态。",
+            "持续上报设备活动、听歌状态与小米运动健康数据。",
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -194,6 +195,39 @@ private fun AgentScreen(settingsStore: SettingsStore) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            Column(modifier = Modifier.fillMaxWidth(0.82f)) {
+                Text("上报小米运动健康数据")
+                Text(
+                    "睡眠/实时睡眠状态、步数、距离、卡路里和最近心率",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(checked = reportHealth, onCheckedChange = { reportHealth = it })
+        }
+
+        if (reportHealth) {
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text("小米健康桥接", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        if (XiaomiHealthCollector.isXiaomiHealthInstalled(context)) {
+                            "已检测到小米运动健康。还需安装配套 LSPosed 模块，并在 LSPosed 中将作用域勾选为“小米运动健康”。"
+                        } else {
+                            "未检测到小米运动健康（com.mi.health）。"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
             Text("开机自启")
             Switch(checked = autoStartOnBoot, onCheckedChange = { autoStartOnBoot = it })
         }
@@ -204,7 +238,7 @@ private fun AgentScreen(settingsStore: SettingsStore) {
         ) {
             Checkbox(checked = consentGiven, onCheckedChange = { consentGiven = it })
             Text(
-                "我已了解并同意上传所选设备活动数据。",
+                "我已了解并同意上传所选设备活动及健康数据。",
                 modifier = Modifier.padding(top = 12.dp)
             )
         }
@@ -357,6 +391,7 @@ private fun AgentScreen(settingsStore: SettingsStore) {
                             consentGiven = consentGiven,
                             reportActivity = reportActivity,
                             reportBattery = reportBattery,
+                            reportHealth = reportHealth,
                             autoStartOnBoot = autoStartOnBoot,
                             isRunningEnabled = runningEnabled,
                             customRules = customRules,
@@ -378,13 +413,13 @@ private fun AgentScreen(settingsStore: SettingsStore) {
                         refreshLogs()
                         return@Button
                     }
-                    if (!reportActivity) {
-                        statusText = "请先开启活动上报。"
-                        settingsStore.appendLog("启动失败：活动上报未开启")
+                    if (!reportActivity && !reportHealth) {
+                        statusText = "请至少开启活动上报或健康数据上报。"
+                        settingsStore.appendLog("启动失败：未选择任何上报项目")
                         refreshLogs()
                         return@Button
                     }
-                    if (!UsageTracker.hasUsageStatsPermission(context)) {
+                    if (reportActivity && !UsageTracker.hasUsageStatsPermission(context)) {
                         statusText = "请先授予使用情况访问权限。"
                         settingsStore.appendLog("启动失败：未授予使用情况访问权限")
                         refreshLogs()
@@ -408,6 +443,7 @@ private fun AgentScreen(settingsStore: SettingsStore) {
                             consentGiven = consentGiven,
                             reportActivity = reportActivity,
                             reportBattery = reportBattery,
+                            reportHealth = reportHealth,
                             autoStartOnBoot = autoStartOnBoot,
                             isRunningEnabled = true,
                             customRules = customRules,

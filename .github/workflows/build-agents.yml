@@ -123,9 +123,9 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [[ "${{ steps.signing_mode.outputs.mode }}" == "release" ]]; then
-            gradle -q :app:assembleRelease
+            gradle -q :app:assembleRelease :xiaomi-health-bridge:assembleRelease
           else
-            gradle -q :app:assembleDebug
+            gradle -q :app:assembleDebug :xiaomi-health-bridge:assembleDebug
           fi
       - name: Prepare APK artifact
         run: |
@@ -141,10 +141,22 @@ jobs:
             exit 1
           fi
           cp "$APK_PATH" live-dashboard-android-agent.apk
+          if [[ "${{ steps.signing_mode.outputs.mode }}" == "release" ]]; then
+            BRIDGE_APK=$(find packages/android-agent/xiaomi-health-bridge/build/outputs/apk/release -maxdepth 1 -type f -name "*release*.apk" | head -n 1)
+          else
+            BRIDGE_APK=$(find packages/android-agent/xiaomi-health-bridge/build/outputs/apk/debug -maxdepth 1 -type f -name "*.apk" | head -n 1)
+          fi
+          if [ -z "$BRIDGE_APK" ]; then
+            echo "No Xiaomi Health bridge APK found"
+            exit 1
+          fi
+          cp "$BRIDGE_APK" live-dashboard-xiaomi-health-lsposed.apk
       - uses: actions/upload-artifact@v4
         with:
           name: android-agent
-          path: live-dashboard-android-agent.apk
+          path: |
+            live-dashboard-android-agent.apk
+            live-dashboard-xiaomi-health-lsposed.apk
 
   build-windows:
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
@@ -215,9 +227,11 @@ jobs:
       - name: Prepare release assets
         run: |
           mv android-agent/live-dashboard-android-agent.apk .
+          mv android-agent/live-dashboard-xiaomi-health-lsposed.apk .
           cp windows-agent/*.zip .
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             live-dashboard-android-agent.apk
+            live-dashboard-xiaomi-health-lsposed.apk
             live-dashboard-windows-agent-*.zip

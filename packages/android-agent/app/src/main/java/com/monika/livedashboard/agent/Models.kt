@@ -7,10 +7,21 @@ data class AgentSettings(
     val consentGiven: Boolean = false,
     val reportActivity: Boolean = true,
     val reportBattery: Boolean = true,
+    val reportHealth: Boolean = false,
     val autoStartOnBoot: Boolean = false,
     val isRunningEnabled: Boolean = false,
     val customRules: List<AppCustomRule> = emptyList(),
 )
+
+data class HealthRecordPayload(
+    val type: String,
+    val value: Double,
+    val unit: String,
+    val timestampMs: Long,
+    val endTimeMs: Long? = null,
+) {
+    fun dedupKey(): String = "$type|$value|$unit|$timestampMs|${endTimeMs ?: 0L}"
+}
 
 data class AppCustomRule(
     val packageName: String,

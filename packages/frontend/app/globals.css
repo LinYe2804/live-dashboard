@@ -1009,6 +1009,15 @@ body.night-mode .dashboard-ambient {
     radial-gradient(circle at 50% 0%, rgba(142, 116, 180, 0.16), transparent 52%);
 }
 
+.dashboard-ambient.dashboard-ambient-custom,
+body.night-mode .dashboard-ambient.dashboard-ambient-custom {
+  background: transparent;
+}
+
+.dashboard-ambient-custom .ambient-orb {
+  display: none;
+}
+
 .ambient-orb {
   position: absolute;
   width: min(42vw, 540px);

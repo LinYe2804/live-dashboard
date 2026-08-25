@@ -483,7 +483,10 @@ function HomeInner({
   return (
     <>
       <div className="dashboard-background" style={backgroundStyle} aria-hidden="true" />
-      <div className="dashboard-ambient" aria-hidden="true">
+      <div
+        className={`dashboard-ambient${config.backgroundImage ? " dashboard-ambient-custom" : ""}`}
+        aria-hidden="true"
+      >
         <span className="ambient-orb ambient-orb-one" />
         <span className="ambient-orb ambient-orb-two" />
         <span className="ambient-orb ambient-orb-three" />

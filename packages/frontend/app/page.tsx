@@ -300,7 +300,18 @@ function HomeInner({
     return dashboards.find((dashboard) => dashboard.id === selectedDashboardId) ?? dashboards[0];
   }, [dashboards, selectedDashboardId]);
   const activeDashboardId = activeDashboard?.isPrimary ? undefined : activeDashboard?.id;
-  const { current, timeline, selectedDate, changeDate, loading, error, viewerCount } = useDashboard(activeDashboardId, adminToken);
+  const {
+    current,
+    timeline,
+    selectedDate,
+    changeDate,
+    loading,
+    refreshing,
+    timelineLoading,
+    timelineRefreshing,
+    error,
+    viewerCount,
+  } = useDashboard(activeDashboardId, adminToken);
   const snapshotTargets = useMemo(() => {
     const activeId = activeDashboard?.id;
     return dashboards.filter((dashboard) => dashboard.id !== activeId);
@@ -495,6 +506,10 @@ function HomeInner({
         className={`dashboard-shell${shieldVisible ? " shielded-dashboard-content" : ""}`}
         style={dashboardStyle}
       >
+      <LoadingRail
+        active={loading || refreshing || timelineLoading || timelineRefreshing}
+        label={loading ? "正在连接实时状态" : timelineLoading ? "正在加载时间线" : "正在同步最新状态"}
+      />
       <Header
         serverTime={current?.server_time}
         viewerCount={viewerCount}
@@ -549,32 +564,26 @@ function HomeInner({
         </div>
       )}
 
-      {loading && !current && (
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <p className="text-2xl">(=^-ω-^=)</p>
-          <div className="loading-dots">
-            <span />
-            <span />
-            <span />
-          </div>
-          <p className="text-xs text-[var(--color-text-muted)]">正在加载喵~</p>
-        </div>
+      {loading && !current ? (
+        <DashboardLoadingSkeleton />
+      ) : (
+        <section className="overview-grid content-reveal mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {resolvedSnapshots.map((dashboard) => (
+            <DashboardOverviewCard
+              key={dashboard.id}
+              dashboard={dashboard}
+              selected={dashboard.id === activeDashboard?.id}
+              onSelect={() => setSelectedDashboardId(dashboard.id)}
+            />
+          ))}
+        </section>
       )}
-
-      <section className="overview-grid mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {resolvedSnapshots.map((dashboard) => (
-          <DashboardOverviewCard
-            key={dashboard.id}
-            dashboard={dashboard}
-            selected={dashboard.id === activeDashboard?.id}
-            onSelect={() => setSelectedDashboardId(dashboard.id)}
-          />
-        ))}
-      </section>
 
       {current && (
         <>
-          <CurrentStatus device={selectedDevice} displayName={activeDashboard?.name} />
+          <div className="content-reveal">
+            <CurrentStatus device={selectedDevice} displayName={activeDashboard?.name} />
+          </div>
 
           <div className="dashboard-workspace glass-panel flex flex-col lg:flex-row gap-6 rounded-3xl p-4 md:p-5">
             <div className="lg:w-56 flex-shrink-0 space-y-2">
@@ -637,8 +646,8 @@ function HomeInner({
 
               {tab === "activity" ? (
                 <>
-                  {loading && filteredTimeline ? (
-                    <div className="opacity-60">
+                  {timelineRefreshing && filteredTimeline ? (
+                    <div className="content-refreshing">
                       <Timeline
                         segments={filteredTimeline.segments}
                         summary={filteredTimeline.summary}
@@ -651,6 +660,8 @@ function HomeInner({
                       summary={filteredTimeline.summary}
                       currentAppByDevice={currentAppByDevice}
                     />
+                  ) : timelineLoading ? (
+                    <TimelineLoadingSkeleton />
                   ) : null}
                 </>
               ) : (
@@ -808,6 +819,86 @@ function buildDashboardSnapshot(
     statusText: onlineDevices.length > 0 ? "在线" : current.devices.length > 0 ? "离线" : "暂无设备",
     reachable: true,
   };
+}
+
+function LoadingRail({ active, label }: { active: boolean; label: string }) {
+  return (
+    <div
+      className={`loading-rail${active ? " loading-rail-active" : ""}`}
+      role="status"
+      aria-live="polite"
+      aria-label={active ? label : undefined}
+    >
+      <span className="loading-rail-track" aria-hidden="true">
+        <span className="loading-rail-glow" />
+      </span>
+      <span className="loading-rail-label">{label}</span>
+    </div>
+  );
+}
+
+function DashboardLoadingSkeleton() {
+  return (
+    <section className="dashboard-loading" aria-label="正在加载实时面板" aria-busy="true">
+      <div className="loading-welcome glass-panel">
+        <div className="loading-emblem" aria-hidden="true">
+          <span className="loading-emblem-ring" />
+          <span className="loading-emblem-face">猫</span>
+          <span className="loading-emblem-spark loading-emblem-spark-one" />
+          <span className="loading-emblem-spark loading-emblem-spark-two" />
+        </div>
+        <div>
+          <p className="loading-welcome-title">正在连接实时世界</p>
+          <p className="loading-welcome-copy">猫猫正在轻轻整理状态数据...</p>
+        </div>
+        <div className="loading-wave" aria-hidden="true">
+          {Array.from({ length: 7 }, (_, index) => <span key={index} />)}
+        </div>
+      </div>
+
+      <div className="loading-overview-grid">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div key={index} className="loading-card glass-panel" style={{ animationDelay: `${index * 70}ms` }}>
+            <div className="skeleton-line skeleton-line-title" />
+            <div className="skeleton-pill" />
+            <div className="skeleton-line skeleton-line-wide" />
+            <div className="loading-card-stats">
+              <span /><span /><span />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="loading-status-card glass-panel">
+        <div className="skeleton-line skeleton-line-short" />
+        <div className="skeleton-line skeleton-line-focus" />
+        <div className="skeleton-line skeleton-line-medium" />
+      </div>
+
+      <div className="loading-workspace glass-panel">
+        <div className="loading-device-column">
+          <div className="skeleton-line skeleton-line-short" />
+          {Array.from({ length: 3 }, (_, index) => <div key={index} className="loading-device-row" />)}
+        </div>
+        <TimelineLoadingSkeleton />
+      </div>
+    </section>
+  );
+}
+
+function TimelineLoadingSkeleton() {
+  return (
+    <div className="timeline-loading" aria-label="正在加载时间线" aria-busy="true">
+      <div className="skeleton-line skeleton-line-short" />
+      {Array.from({ length: 5 }, (_, index) => (
+        <div key={index} className="timeline-loading-row" style={{ animationDelay: `${index * 85}ms` }}>
+          <span className="timeline-loading-dot" />
+          <span className="skeleton-line" />
+          <span className="timeline-loading-time" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function DashboardSwitcher({

@@ -54,6 +54,7 @@ export default function HealthData({ selectedDate, deviceId, dashboardId, adminT
     const load = async () => {
       if (requestInFlight || controller.signal.aborted) return;
       requestInFlight = true;
+      setLoading(true);
       try {
         const nextData = await fetchHealthData(
           selectedDate,
@@ -121,8 +122,19 @@ export default function HealthData({ selectedDate, deviceId, dashboardId, adminT
 
   if (loading && !data) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <p className="text-xs text-[var(--color-text-muted)]">加载健康数据中...</p>
+      <div className="health-loading" aria-label="正在加载健康数据" aria-busy="true">
+        <div className="health-loading-grid">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="health-loading-card" style={{ animationDelay: `${index * 80}ms` }}>
+              <span className="health-loading-icon" />
+              <span className="health-loading-line" />
+              <span className="health-loading-value" />
+            </div>
+          ))}
+        </div>
+        <div className="health-loading-chart">
+          <span /><span /><span /><span /><span /><span /><span />
+        </div>
       </div>
     );
   }
@@ -155,7 +167,8 @@ export default function HealthData({ selectedDate, deviceId, dashboardId, adminT
   const secondaryTypes = sortedTypes.filter((t) => !CORE_TYPES.includes(t));
 
   return (
-    <div className="space-y-3">
+    <div className={`health-content space-y-3${loading ? " content-refreshing" : ""}`}>
+      {loading && <span className="health-sync-indicator">同步中</span>}
       {/* Core metrics cards */}
       {coreTypes.length > 0 && (
         <div className="grid grid-cols-2 gap-2">

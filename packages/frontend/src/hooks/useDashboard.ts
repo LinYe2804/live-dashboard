@@ -22,6 +22,9 @@ export function useDashboard(dashboardId?: string, adminToken?: string) {
   const [timeline, setTimeline] = useState<TimelineResponse | null>(null);
   const [selectedDate, setSelectedDate] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [timelineLoading, setTimelineLoading] = useState(true);
+  const [timelineRefreshing, setTimelineRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const requestOptions = useMemo<DashboardRequestOptions | undefined>(() => {
@@ -37,9 +40,10 @@ export function useDashboard(dashboardId?: string, adminToken?: string) {
     const controller = new AbortController();
     let requestId = 0;
 
-    const doFetchCurrent = async () => {
+    const doFetchCurrent = async (initial = false) => {
       const thisRequest = ++requestId;
       const isActive = () => !controller.signal.aborted && thisRequest === requestId;
+      if (!initial) setRefreshing(true);
 
       try {
         const cur = await fetchCurrent(controller.signal, requestOptions);
@@ -54,6 +58,8 @@ export function useDashboard(dashboardId?: string, adminToken?: string) {
           setError(e instanceof Error ? e.message : "Failed to fetch data");
           setLoading(false);
         }
+      } finally {
+        if (isActive()) setRefreshing(false);
       }
     };
 
@@ -61,7 +67,8 @@ export function useDashboard(dashboardId?: string, adminToken?: string) {
     setTimeline(null);
     setViewerCount(0);
     setLoading(true);
-    doFetchCurrent();
+    setRefreshing(false);
+    void doFetchCurrent(true);
     const pollId = setInterval(doFetchCurrent, CURRENT_POLL_INTERVAL);
 
     return () => {
@@ -76,8 +83,13 @@ export function useDashboard(dashboardId?: string, adminToken?: string) {
     const controller = new AbortController();
     let requestId = 0;
 
-    const doFetchTimeline = async () => {
+    const doFetchTimeline = async (initial = false) => {
       const thisRequest = ++requestId;
+      if (initial) {
+        setTimelineLoading(true);
+      } else {
+        setTimelineRefreshing(true);
+      }
       try {
         const tl = await fetchTimeline(selectedDate, controller.signal, requestOptions);
         if (!controller.signal.aborted && thisRequest === requestId) {
@@ -85,10 +97,17 @@ export function useDashboard(dashboardId?: string, adminToken?: string) {
         }
       } catch {
         // Keep stale timeline data if timeline refresh fails.
+      } finally {
+        if (!controller.signal.aborted && thisRequest === requestId) {
+          setTimelineLoading(false);
+          setTimelineRefreshing(false);
+        }
       }
     };
 
-    doFetchTimeline();
+    setTimeline(null);
+    setTimelineRefreshing(false);
+    void doFetchTimeline(true);
     const pollId = setInterval(doFetchTimeline, TIMELINE_POLL_INTERVAL);
 
     return () => {
@@ -101,5 +120,16 @@ export function useDashboard(dashboardId?: string, adminToken?: string) {
     setSelectedDate(date);
   }, []);
 
-  return { current, timeline, selectedDate, changeDate, loading, error, viewerCount };
+  return {
+    current,
+    timeline,
+    selectedDate,
+    changeDate,
+    loading,
+    refreshing,
+    timelineLoading,
+    timelineRefreshing,
+    error,
+    viewerCount,
+  };
 }

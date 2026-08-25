@@ -165,7 +165,7 @@ export default function HealthData({ selectedDate, deviceId, dashboardId, adminT
             return (
               <div
                 key={type}
-                className="border border-dashed border-[var(--color-border)] rounded-md p-3"
+                className="health-metric-card border border-dashed border-[var(--color-border)] rounded-xl p-3"
               >
                 <div className="flex items-center gap-1.5 mb-1">
                   <span className="text-sm">{meta?.icon}</span>
@@ -189,7 +189,7 @@ export default function HealthData({ selectedDate, deviceId, dashboardId, adminT
 
       {/* Heart rate trend chart */}
       {heartRatePoints.length >= 2 && (
-        <div className="border border-dashed border-[var(--color-border)] rounded-md p-3">
+        <div className="health-metric-card border border-dashed border-[var(--color-border)] rounded-xl p-3">
           <p className="text-[10px] text-[var(--color-text-muted)] mb-2">今日心率趋势</p>
           <HeartRateChart points={heartRatePoints} />
         </div>
@@ -197,7 +197,7 @@ export default function HealthData({ selectedDate, deviceId, dashboardId, adminT
 
       {/* Secondary metrics */}
       {secondaryTypes.length > 0 && (
-        <div className="border border-dashed border-[var(--color-border)] rounded-md p-2">
+        <div className="health-metric-card border border-dashed border-[var(--color-border)] rounded-xl p-2">
           <div className="space-y-1">
             {secondaryTypes.map((type) => {
               const meta = TYPE_META[type];

@@ -29,7 +29,7 @@ export default function Header({ serverTime, viewerCount = 0, displayName: displ
   const greeting = getGreeting();
 
   return (
-    <header className="pb-4 mb-6 separator-dashed">
+    <header className="dashboard-header glass-panel p-4 md:p-5 mb-6">
       <div className="flex items-end justify-between">
         {/* Left: title + greeting */}
         <div>

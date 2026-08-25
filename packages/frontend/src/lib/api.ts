@@ -28,12 +28,20 @@ export interface AdminSiteConfig {
   siteDescription: string;
   shieldEnabled: boolean;
   shieldStatusText: string;
+  backgroundImage: string;
+  backgroundBlur: number;
+  backgroundOpacity: number;
+  glassOpacity: number;
 }
 
 export interface AdminSiteConfigUpdate {
   displayName?: string;
   siteTitle?: string;
   siteDescription?: string;
+  backgroundImage?: string;
+  backgroundBlur?: number;
+  backgroundOpacity?: number;
+  glassOpacity?: number;
 }
 
 export interface AdminDeviceConfig {
@@ -232,6 +240,10 @@ export interface SiteConfig {
   dashboards: DashboardProfile[];
   shieldEnabled: boolean;
   shieldStatusText: string;
+  backgroundImage: string;
+  backgroundBlur: number;
+  backgroundOpacity: number;
+  glassOpacity: number;
 }
 
 const defaultConfig: SiteConfig = {
@@ -242,6 +254,10 @@ const defaultConfig: SiteConfig = {
   dashboards: [],
   shieldEnabled: false,
   shieldStatusText: "▓▓▓ ░▒▓ ████████ ▓▒░ ▓▓▓",
+  backgroundImage: "",
+  backgroundBlur: 4,
+  backgroundOpacity: 72,
+  glassOpacity: 76,
 };
 
 export { defaultConfig };
@@ -303,6 +319,14 @@ export async function fetchConfig(
       shieldStatusText: typeof data.shieldStatusText === "string"
         ? data.shieldStatusText
         : defaultConfig.shieldStatusText,
+      backgroundImage: typeof data.backgroundImage === "string"
+        ? data.backgroundImage
+        : defaultConfig.backgroundImage,
+      backgroundBlur: normalizeVisualNumber(data.backgroundBlur, defaultConfig.backgroundBlur, 0, 30),
+      backgroundOpacity: normalizeVisualNumber(
+        data.backgroundOpacity, defaultConfig.backgroundOpacity, 0, 100,
+      ),
+      glassOpacity: normalizeVisualNumber(data.glassOpacity, defaultConfig.glassOpacity, 20, 100),
     };
   } catch {
     return defaultConfig;
@@ -328,6 +352,17 @@ export async function fetchHealthData(
     API_TIMEOUT_MS,
     buildOptionalAdminHeaders(options?.adminToken),
   );
+}
+
+function normalizeVisualNumber(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, value))
+    : fallback;
 }
 
 function buildOptionalAdminHeaders(adminToken?: string): HeadersInit | undefined {
@@ -382,6 +417,10 @@ function normalizeAdminSiteConfig(value: unknown): AdminSiteConfig | null {
     siteDescription: record.siteDescription,
     shieldEnabled: record.shieldEnabled,
     shieldStatusText: record.shieldStatusText,
+    backgroundImage: typeof record.backgroundImage === "string" ? record.backgroundImage : "",
+    backgroundBlur: normalizeVisualNumber(record.backgroundBlur, 4, 0, 30),
+    backgroundOpacity: normalizeVisualNumber(record.backgroundOpacity, 72, 0, 100),
+    glassOpacity: normalizeVisualNumber(record.glassOpacity, 76, 20, 100),
   };
 }
 

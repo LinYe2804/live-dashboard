@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+} from "react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useConfig, useConfigLoader, ConfigContext } from "@/hooks/useConfig";
 import type {
@@ -64,6 +72,10 @@ export default function Home() {
       siteDescription: site.siteDescription,
       shieldEnabled: site.shieldEnabled,
       shieldStatusText: site.shieldStatusText,
+      backgroundImage: site.backgroundImage,
+      backgroundBlur: site.backgroundBlur,
+      backgroundOpacity: site.backgroundOpacity,
+      glassOpacity: site.glassOpacity,
     }));
   }, []);
 
@@ -183,13 +195,13 @@ function HomeInner({
     }
 
     try {
-      setAdminStatus("正在保存网页名称...");
+      setAdminStatus("正在保存网页外观...");
       const site = await updateAdminSiteConfig(payload, adminToken.trim());
       onSiteConfigUpdated(site);
-      setAdminStatus("网页名称已更新");
+      setAdminStatus("网页外观已更新");
     } catch (error) {
       const message = error instanceof Error ? error.message : "请检查 Token";
-      setAdminStatus(`网页名称保存失败：${message}`);
+      setAdminStatus(`网页外观保存失败：${message}`);
     }
   }, [adminToken, onSiteConfigUpdated]);
 
@@ -457,10 +469,29 @@ function HomeInner({
   }, [allOffline]);
 
   const shieldVisible = !adminToken && config.shieldEnabled;
+  const backgroundStyle = {
+    backgroundImage: config.backgroundImage
+      ? `url(${JSON.stringify(config.backgroundImage)})`
+      : undefined,
+    "--background-blur": `${config.backgroundBlur}px`,
+    opacity: config.backgroundImage ? config.backgroundOpacity / 100 : 0,
+  } as CSSProperties;
+  const dashboardStyle = {
+    "--glass-opacity": `${config.glassOpacity}%`,
+  } as CSSProperties;
 
   return (
     <>
-      <div className={shieldVisible ? "shielded-dashboard-content" : undefined}>
+      <div className="dashboard-background" style={backgroundStyle} aria-hidden="true" />
+      <div className="dashboard-ambient" aria-hidden="true">
+        <span className="ambient-orb ambient-orb-one" />
+        <span className="ambient-orb ambient-orb-two" />
+        <span className="ambient-orb ambient-orb-three" />
+      </div>
+      <div
+        className={`dashboard-shell${shieldVisible ? " shielded-dashboard-content" : ""}`}
+        style={dashboardStyle}
+      >
       <Header
         serverTime={current?.server_time}
         viewerCount={viewerCount}
@@ -476,6 +507,10 @@ function HomeInner({
             siteDescription: config.siteDescription,
             shieldEnabled: config.shieldEnabled,
             shieldStatusText: config.shieldStatusText,
+            backgroundImage: config.backgroundImage,
+            backgroundBlur: config.backgroundBlur,
+            backgroundOpacity: config.backgroundOpacity,
+            glassOpacity: config.glassOpacity,
           }}
           devices={adminDevices}
           adminToken={adminToken}
@@ -523,7 +558,7 @@ function HomeInner({
         </div>
       )}
 
-      <section className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <section className="overview-grid mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {resolvedSnapshots.map((dashboard) => (
           <DashboardOverviewCard
             key={dashboard.id}
@@ -538,7 +573,7 @@ function HomeInner({
         <>
           <CurrentStatus device={selectedDevice} displayName={activeDashboard?.name} />
 
-          <div className="flex flex-col lg:flex-row gap-6">
+          <div className="dashboard-workspace glass-panel flex flex-col lg:flex-row gap-6 rounded-3xl p-4 md:p-5">
             <div className="lg:w-56 flex-shrink-0 space-y-2">
               <h2 className="text-xs font-bold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
                 Devices
@@ -782,7 +817,7 @@ function DashboardSwitcher({
   onSelect: (id: string) => void;
 }) {
   return (
-    <section className="mb-4">
+    <section className="switcher-panel glass-panel mb-4 rounded-2xl p-4">
       <div className="mb-2">
         <p className="text-xs font-bold uppercase tracking-[0.25em] text-[var(--color-text-muted)]">
           Panels
@@ -861,6 +896,10 @@ function DashboardAdminPanel({
   const [siteDisplayName, setSiteDisplayName] = useState(siteConfig.displayName);
   const [siteTitle, setSiteTitle] = useState(siteConfig.siteTitle);
   const [siteDescription, setSiteDescription] = useState(siteConfig.siteDescription);
+  const [backgroundImage, setBackgroundImage] = useState(siteConfig.backgroundImage);
+  const [backgroundBlur, setBackgroundBlur] = useState(siteConfig.backgroundBlur);
+  const [backgroundOpacity, setBackgroundOpacity] = useState(siteConfig.backgroundOpacity);
+  const [glassOpacity, setGlassOpacity] = useState(siteConfig.glassOpacity);
   const [deviceToken, setDeviceToken] = useState("");
   const [deviceId, setDeviceId] = useState("");
   const [deviceName, setDeviceName] = useState("");
@@ -871,8 +910,21 @@ function DashboardAdminPanel({
     setSiteDisplayName(siteConfig.displayName);
     setSiteTitle(siteConfig.siteTitle);
     setSiteDescription(siteConfig.siteDescription);
+    setBackgroundImage(siteConfig.backgroundImage);
+    setBackgroundBlur(siteConfig.backgroundBlur);
+    setBackgroundOpacity(siteConfig.backgroundOpacity);
+    setGlassOpacity(siteConfig.glassOpacity);
     setShieldStatusText(siteConfig.shieldStatusText);
-  }, [siteConfig.displayName, siteConfig.shieldStatusText, siteConfig.siteDescription, siteConfig.siteTitle]);
+  }, [
+    siteConfig.backgroundBlur,
+    siteConfig.backgroundImage,
+    siteConfig.backgroundOpacity,
+    siteConfig.displayName,
+    siteConfig.glassOpacity,
+    siteConfig.shieldStatusText,
+    siteConfig.siteDescription,
+    siteConfig.siteTitle,
+  ]);
 
   const handleUnlock = async () => {
     const password = passwordInput.trim();
@@ -913,14 +965,14 @@ function DashboardAdminPanel({
   };
 
   return (
-    <section className="mb-4 rounded-2xl border-2 border-[var(--color-accent)] bg-[var(--color-card)] px-4 py-3">
+    <section className="admin-panel glass-panel mb-4 rounded-2xl border-2 border-[var(--color-accent)] px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-text-muted)]">
             多人面板管理
           </p>
           <p className="text-xs text-[var(--color-text-muted)] mt-1">
-            网页直接管理面板、主面板设备、网页名称（需要管理密码）
+            网页直接管理面板、设备、屏蔽状态与视觉外观（需要管理密码）
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1108,6 +1160,76 @@ function DashboardAdminPanel({
                   className="panel-chip w-full text-xs px-3 py-2 md:col-span-2"
                 />
               </div>
+
+              <div className="appearance-editor mt-3">
+                <div className="appearance-editor-heading">
+                  <div>
+                    <p className="text-xs font-bold text-[var(--color-text)]">背景与毛玻璃</p>
+                    <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
+                      支持 HTTPS 图片地址或站内路径，留空恢复默认渐变背景。
+                    </p>
+                  </div>
+                  <span className="appearance-preview-dot" aria-hidden="true" />
+                </div>
+
+                <input
+                  value={backgroundImage}
+                  onChange={(event) => setBackgroundImage(event.target.value)}
+                  placeholder="背景图片 URL（https://... 或 /background.jpg）"
+                  maxLength={2048}
+                  className="panel-chip w-full text-xs px-3 py-2"
+                  aria-label="自定义背景图片地址"
+                />
+
+                <div className="appearance-live-preview" aria-label="背景效果预览">
+                  <div
+                    className="appearance-live-preview-bg"
+                    style={{
+                      backgroundImage: backgroundImage.trim()
+                        ? `url(${JSON.stringify(backgroundImage.trim())})`
+                        : "linear-gradient(135deg, #f5afc8, #a6ddda 58%, #f3cf82)",
+                      filter: `blur(${Math.min(backgroundBlur, 12)}px)`,
+                      opacity: backgroundOpacity / 100,
+                    }}
+                  />
+                  <div
+                    className="appearance-live-preview-glass"
+                    style={{ backgroundColor: `rgba(255, 253, 247, ${glassOpacity / 100})` }}
+                  >
+                    <span />
+                    <b>Glass preview</b>
+                    <small>{backgroundBlur}px · {backgroundOpacity}% · {glassOpacity}%</small>
+                  </div>
+                </div>
+
+                <div className="appearance-sliders">
+                  <AppearanceSlider
+                    label="背景模糊"
+                    value={backgroundBlur}
+                    min={0}
+                    max={30}
+                    unit="px"
+                    onChange={setBackgroundBlur}
+                  />
+                  <AppearanceSlider
+                    label="背景不透明度"
+                    value={backgroundOpacity}
+                    min={0}
+                    max={100}
+                    unit="%"
+                    onChange={setBackgroundOpacity}
+                  />
+                  <AppearanceSlider
+                    label="玻璃不透明度"
+                    value={glassOpacity}
+                    min={20}
+                    max={100}
+                    unit="%"
+                    onChange={setGlassOpacity}
+                  />
+                </div>
+              </div>
+
               <div className="mt-2">
                 <button
                   type="button"
@@ -1118,11 +1240,15 @@ function DashboardAdminPanel({
                       siteDescription,
                       shieldEnabled,
                       shieldStatusText,
+                      backgroundImage: backgroundImage.trim(),
+                      backgroundBlur,
+                      backgroundOpacity,
+                      glassOpacity,
                     });
                   }}
                   className="pill-btn text-xs px-3 py-1"
                 >
-                  保存网页名称
+                  保存网页外观
                 </button>
               </div>
 
@@ -1234,6 +1360,38 @@ function DashboardAdminPanel({
         </>
       )}
     </section>
+  );
+}
+
+function AppearanceSlider({
+  label,
+  value,
+  min,
+  max,
+  unit,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  unit: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="appearance-slider">
+      <span>
+        {label}
+        <b>{value}{unit}</b>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
   );
 }
 

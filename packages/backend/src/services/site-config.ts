@@ -14,6 +14,10 @@ export interface SiteConfig {
   dashboards: DashboardProfile[];
   shieldEnabled: boolean;
   shieldStatusText: string;
+  backgroundImage: string;
+  backgroundBlur: number;
+  backgroundOpacity: number;
+  glassOpacity: number;
 }
 
 export interface DashboardProfile {
@@ -38,7 +42,14 @@ const RUNTIME_SITE_TITLE_KEY = "site_title";
 const RUNTIME_SITE_DESC_KEY = "site_description";
 const RUNTIME_SHIELD_ENABLED_KEY = "shield_enabled";
 const RUNTIME_SHIELD_STATUS_KEY = "shield_status_text";
+const RUNTIME_BACKGROUND_IMAGE_KEY = "background_image";
+const RUNTIME_BACKGROUND_BLUR_KEY = "background_blur";
+const RUNTIME_BACKGROUND_OPACITY_KEY = "background_opacity";
+const RUNTIME_GLASS_OPACITY_KEY = "glass_opacity";
 const DEFAULT_SHIELD_STATUS_TEXT = "▓▓▓ ░▒▓ ████████ ▓▒░ ▓▓▓";
+const DEFAULT_BACKGROUND_BLUR = 4;
+const DEFAULT_BACKGROUND_OPACITY = 72;
+const DEFAULT_GLASS_OPACITY = 76;
 
 function nonEmpty(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
@@ -145,7 +156,7 @@ function getDashboards(): DashboardProfile[] {
   const raw = nonEmpty(process.env.EXTERNAL_DASHBOARDS);
   const hiddenIds = new Set(getHiddenExternalDashboardIds());
   const fromDb = getExternalDashboards()
-    .map((record) => {
+    .map<DashboardProfile | null>((record) => {
       const normalizedUrl = normalizeDashboardUrl(record.url);
       if (!normalizedUrl) return null;
       return {
@@ -200,6 +211,7 @@ export function getSiteConfig(): SiteConfig {
     nonEmpty(process.env.SITE_DESC) ??
     `What is ${displayName} doing right now?`;
   const rawFavicon = nonEmpty(process.env.SITE_FAVICON) ?? DEFAULT_FAVICON;
+  const rawBackground = nonEmpty(runtimeSettings[RUNTIME_BACKGROUND_IMAGE_KEY]) ?? "";
 
   return {
     displayName,
@@ -210,7 +222,37 @@ export function getSiteConfig(): SiteConfig {
     shieldEnabled: runtimeSettings[RUNTIME_SHIELD_ENABLED_KEY] === "true",
     shieldStatusText:
       nonEmpty(runtimeSettings[RUNTIME_SHIELD_STATUS_KEY]) ?? DEFAULT_SHIELD_STATUS_TEXT,
+    backgroundImage: rawBackground && isValidBackgroundUrl(rawBackground) ? rawBackground : "",
+    backgroundBlur: readRuntimeNumber(
+      runtimeSettings, RUNTIME_BACKGROUND_BLUR_KEY, DEFAULT_BACKGROUND_BLUR, 0, 30,
+    ),
+    backgroundOpacity: readRuntimeNumber(
+      runtimeSettings, RUNTIME_BACKGROUND_OPACITY_KEY, DEFAULT_BACKGROUND_OPACITY, 0, 100,
+    ),
+    glassOpacity: readRuntimeNumber(
+      runtimeSettings, RUNTIME_GLASS_OPACITY_KEY, DEFAULT_GLASS_OPACITY, 20, 100,
+    ),
   };
+}
+
+function isValidBackgroundUrl(url: string): boolean {
+  if (url.startsWith("/") && !url.startsWith("//")) return true;
+  try {
+    return new URL(url).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function readRuntimeNumber(
+  settings: Record<string, string>,
+  key: string,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const value = Number(settings[key]);
+  return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
 }
 
 export function isShieldEnabled(): boolean {
@@ -251,6 +293,18 @@ function updateRuntimeStringSetting(
   return true;
 }
 
+function updateRuntimeNumberSetting(
+  key: string,
+  value: unknown,
+  min: number,
+  max: number,
+): boolean {
+  if (value === undefined) return true;
+  if (typeof value !== "number" || !Number.isFinite(value)) return false;
+  upsertRuntimeSiteSetting(key, String(Math.min(max, Math.max(min, Math.round(value)))));
+  return true;
+}
+
 export function updateSiteConfigFromAdmin(input: unknown): SiteConfig | null {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return null;
@@ -273,7 +327,36 @@ export function updateSiteConfigFromAdmin(input: unknown): SiteConfig | null {
     240,
   );
 
-  if (!isDisplayNameOk || !isSiteTitleOk || !isSiteDescriptionOk) {
+  let isBackgroundImageOk = true;
+  if (payload.backgroundImage !== undefined) {
+    if (typeof payload.backgroundImage !== "string") {
+      isBackgroundImageOk = false;
+    } else {
+      const backgroundImage = payload.backgroundImage.trim();
+      if (!backgroundImage) {
+        deleteRuntimeSiteSetting(RUNTIME_BACKGROUND_IMAGE_KEY);
+      } else if (backgroundImage.length <= 2048 && isValidBackgroundUrl(backgroundImage)) {
+        upsertRuntimeSiteSetting(RUNTIME_BACKGROUND_IMAGE_KEY, backgroundImage);
+      } else {
+        isBackgroundImageOk = false;
+      }
+    }
+  }
+  const isBackgroundBlurOk = updateRuntimeNumberSetting(
+    RUNTIME_BACKGROUND_BLUR_KEY, payload.backgroundBlur, 0, 30,
+  );
+  const isBackgroundOpacityOk = updateRuntimeNumberSetting(
+    RUNTIME_BACKGROUND_OPACITY_KEY, payload.backgroundOpacity, 0, 100,
+  );
+  const isGlassOpacityOk = updateRuntimeNumberSetting(
+    RUNTIME_GLASS_OPACITY_KEY, payload.glassOpacity, 20, 100,
+  );
+
+  if (
+    !isDisplayNameOk || !isSiteTitleOk || !isSiteDescriptionOk ||
+    !isBackgroundImageOk || !isBackgroundBlurOk ||
+    !isBackgroundOpacityOk || !isGlassOpacityOk
+  ) {
     return null;
   }
 

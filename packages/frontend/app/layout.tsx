@@ -33,7 +33,7 @@ export default function RootLayout({
           ))}
         </div>
 
-        <main className="relative z-10 max-w-4xl mx-auto px-4 py-8">
+        <main className="relative z-10 max-w-6xl mx-auto px-4 py-6 md:px-6 md:py-10">
           {children}
         </main>
       </body>

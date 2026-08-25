@@ -14,6 +14,10 @@ const serverRenderConfig: SiteConfig = {
   dashboards: defaultConfig.dashboards,
   shieldEnabled: false,
   shieldStatusText: defaultConfig.shieldStatusText,
+  backgroundImage: defaultConfig.backgroundImage,
+  backgroundBlur: defaultConfig.backgroundBlur,
+  backgroundOpacity: defaultConfig.backgroundOpacity,
+  glassOpacity: defaultConfig.glassOpacity,
 };
 
 function readDocumentValue(value: string | null | undefined, fallback: string): string {

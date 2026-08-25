@@ -35,6 +35,10 @@ export function handleAdminConfigGet(req: Request): Response {
       siteDescription: site.siteDescription,
       shieldEnabled: site.shieldEnabled,
       shieldStatusText: site.shieldStatusText,
+      backgroundImage: site.backgroundImage,
+      backgroundBlur: site.backgroundBlur,
+      backgroundOpacity: site.backgroundOpacity,
+      glassOpacity: site.glassOpacity,
     },
     devices: getAdminDeviceConfigs(),
   });
@@ -92,6 +96,10 @@ export async function handleAdminSiteUpdate(req: Request): Promise<Response> {
       siteDescription: site.siteDescription,
       shieldEnabled: site.shieldEnabled,
       shieldStatusText: site.shieldStatusText,
+      backgroundImage: site.backgroundImage,
+      backgroundBlur: site.backgroundBlur,
+      backgroundOpacity: site.backgroundOpacity,
+      glassOpacity: site.glassOpacity,
     },
   });
 }

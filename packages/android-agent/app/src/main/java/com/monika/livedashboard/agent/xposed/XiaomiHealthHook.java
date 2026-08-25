@@ -6,6 +6,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 
@@ -27,6 +28,7 @@ final class XiaomiHealthHook {
     private static final long COLLECTION_INTERVAL_MS = 60_000L;
     private static final Set<String> SENT_HISTORY = new HashSet<>();
     private static volatile boolean started;
+    private static volatile boolean sleepStateLogged;
 
     private XiaomiHealthHook() {}
 
@@ -76,11 +78,7 @@ final class XiaomiHealthHook {
     private static void collect(ContentResolver resolver) throws Exception {
         JSONArray records = new JSONArray();
         long now = System.currentTimeMillis();
-        Bundle result = resolver.call(
-            Uri.parse(BASE_URI), BASE_URI + "/sleep#is_maybe_sleeping", null, null
-        );
-        boolean sleeping = result != null && result.getBoolean("extra_maybe_sleeping", false);
-        records.put(record("sleep_state", sleeping ? 1.0 : 0.0, "state", now, null));
+        collectSleepState(resolver, records, now);
 
         collectActivity(resolver, records, now);
         collectHeartRate(resolver, records);
@@ -91,6 +89,39 @@ final class XiaomiHealthHook {
                 .put("type", "health")
                 .put("timestamp_ms", now)
                 .put("records", records));
+        }
+    }
+
+    private static void collectSleepState(
+        ContentResolver resolver, JSONArray records, long now
+    ) {
+        try {
+            // Xiaomi's provider treats the method itself as a full URI and reads the
+            // operation name from its fragment. Prefer the authority overload on
+            // Android 10+ so the full URI reaches DataContentProvider.call unchanged.
+            Bundle result;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                result = resolver.call(
+                    AUTHORITY, BASE_URI + "/sleep#is_maybe_sleeping", null, null
+                );
+            } else {
+                result = resolver.call(
+                    Uri.parse(BASE_URI), BASE_URI + "/sleep#is_maybe_sleeping", null, null
+                );
+            }
+            if (result == null || !result.containsKey("extra_maybe_sleeping")) {
+                throw new IllegalStateException("Xiaomi Health returned no sleep state");
+            }
+            boolean sleeping = result.getBoolean("extra_maybe_sleeping");
+            records.put(record("sleep_state", sleeping ? 1.0 : 0.0, "state", now, null));
+            if (!sleepStateLogged) {
+                sleepStateLogged = true;
+                XposedBridge.log(
+                    "LiveDashboard: sleep state collection active (sleeping=" + sleeping + ")"
+                );
+            }
+        } catch (Throwable error) {
+            XposedBridge.log("LiveDashboard: sleep state collection failed: " + error);
         }
     }
 

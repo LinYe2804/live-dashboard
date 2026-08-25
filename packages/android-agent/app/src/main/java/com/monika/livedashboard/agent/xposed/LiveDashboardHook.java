@@ -21,7 +21,9 @@ public final class LiveDashboardHook implements IXposedHookLoadPackage {
         if (ANDROID_PACKAGE.equals(param.packageName) && ANDROID_PACKAGE.equals(param.processName)) {
             hookForegroundActivity(param.classLoader);
             hookMediaNotifications(param.classLoader);
-        } else if (XIAOMI_HEALTH_PACKAGE.equals(param.packageName)) {
+        } else if (XIAOMI_HEALTH_PACKAGE.equals(param.packageName)
+            && param.processName != null
+            && param.processName.endsWith(":device")) {
             XiaomiHealthHook.install(param.processName);
         }
     }

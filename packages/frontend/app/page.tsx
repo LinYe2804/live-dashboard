@@ -393,26 +393,42 @@ function HomeInner({
     }
 
     const controller = new AbortController();
+    let requestInFlight = false;
     setHasHealthData(false);
 
-    fetchHealthData(
-      selectedDate,
-      controller.signal,
-      selectedDeviceIdResolved,
-      activeDashboardId || adminToken ? { dashboardId: activeDashboardId, adminToken } : undefined,
-    )
-      .then((result) => {
-        if (!controller.signal.aborted) {
-          setHasHealthData(result.records.length > 0);
-        }
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setHasHealthData(false);
-        }
-      });
+    const probeHealthData = async () => {
+      if (requestInFlight || controller.signal.aborted) return;
+      requestInFlight = true;
+      try {
+        const result = await fetchHealthData(
+          selectedDate,
+          controller.signal,
+          selectedDeviceIdResolved,
+          activeDashboardId || adminToken ? { dashboardId: activeDashboardId, adminToken } : undefined,
+        );
+        if (!controller.signal.aborted) setHasHealthData(result.records.length > 0);
+      } catch {
+        // Keep the last known availability during a transient network failure.
+      } finally {
+        requestInFlight = false;
+      }
+    };
 
-    return () => controller.abort();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void probeHealthData();
+    };
+
+    void probeHealthData();
+    const timer = window.setInterval(probeHealthData, 15_000);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, [activeDashboardId, adminToken, selectedDate, selectedDeviceIdResolved]);
 
   const filteredTimeline = useMemo(() => {

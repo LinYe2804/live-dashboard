@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import type { HealthRecord, HealthDataResponse } from "@/lib/api";
 import { fetchHealthData } from "@/lib/api";
 
+const HEALTH_POLL_INTERVAL_MS = 15_000;
+
 // Type metadata for display
 const TYPE_META: Record<string, { label: string; icon: string; priority: number }> = {
   heart_rate:             { label: "心率",     icon: "💓",  priority: 1 },
@@ -45,28 +47,49 @@ export default function HealthData({ selectedDate, deviceId, dashboardId, adminT
   useEffect(() => {
     if (!selectedDate) return;
     const controller = new AbortController();
+    let requestInFlight = false;
     setLoading(true);
     setError(null);
 
-    fetchHealthData(
-      selectedDate,
-      controller.signal,
-      deviceId,
-      dashboardId || adminToken ? { dashboardId, adminToken } : undefined,
-    )
-      .then((d) => {
-        if (!controller.signal.aborted) setData(d);
-      })
-      .catch((e) => {
-        if (!controller.signal.aborted && e?.name !== "AbortError") {
+    const load = async () => {
+      if (requestInFlight || controller.signal.aborted) return;
+      requestInFlight = true;
+      try {
+        const nextData = await fetchHealthData(
+          selectedDate,
+          controller.signal,
+          deviceId,
+          dashboardId || adminToken ? { dashboardId, adminToken } : undefined,
+        );
+        if (!controller.signal.aborted) {
+          setData(nextData);
+          setError(null);
+        }
+      } catch (e: unknown) {
+        if (!controller.signal.aborted && (e as { name?: string })?.name !== "AbortError") {
           setError(e instanceof Error ? e.message : String(e));
         }
-      })
-      .finally(() => {
+      } finally {
+        requestInFlight = false;
         if (!controller.signal.aborted) setLoading(false);
-      });
+      }
+    };
 
-    return () => controller.abort();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+
+    void load();
+    const timer = window.setInterval(load, HEALTH_POLL_INTERVAL_MS);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, [adminToken, dashboardId, selectedDate, deviceId]);
 
   // Group records by type, get latest value for each
@@ -104,7 +127,7 @@ export default function HealthData({ selectedDate, deviceId, dashboardId, adminT
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="text-center py-8">
         <p className="text-xs text-[var(--color-text-muted)]">健康数据加载失败</p>

@@ -1444,20 +1444,6 @@ body.night-mode .dashboard-shell .health-metric-card {
   animation: loading-ring-spin 3.6s linear infinite reverse;
 }
 
-.loading-emblem-face {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 13px;
-  color: #fff;
-  background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 58%, var(--color-secondary)));
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-primary) 28%, transparent);
-  font-size: 14px;
-  font-weight: 900;
-  animation: loading-face-float 2.2s ease-in-out infinite;
-}
-
 .loading-emblem-spark {
   position: absolute;
   width: 7px;
@@ -1729,11 +1715,6 @@ body.night-mode .dashboard-shell .health-metric-card {
 
 @keyframes loading-ring-spin { to { transform: rotate(360deg); } }
 
-@keyframes loading-face-float {
-  0%, 100% { transform: translateY(0) rotate(-2deg); }
-  50% { transform: translateY(-3px) rotate(2deg); }
-}
-
 @keyframes loading-spark {
   0%, 100% { opacity: 0.28; transform: scale(0.65) rotate(0); }
   50% { opacity: 1; transform: scale(1.08) rotate(90deg); }
@@ -1801,7 +1782,6 @@ body.night-mode .dashboard-shell .health-metric-card {
   .loading-rail-glow,
   .loading-emblem-ring,
   .loading-emblem-ring::after,
-  .loading-emblem-face,
   .loading-emblem-spark,
   .loading-wave span,
   .loading-card,

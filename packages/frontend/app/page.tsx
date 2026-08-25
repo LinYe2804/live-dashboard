@@ -843,7 +843,6 @@ function DashboardLoadingSkeleton() {
       <div className="loading-welcome glass-panel">
         <div className="loading-emblem" aria-hidden="true">
           <span className="loading-emblem-ring" />
-          <span className="loading-emblem-face" />
           <span className="loading-emblem-spark loading-emblem-spark-one" />
           <span className="loading-emblem-spark loading-emblem-spark-two" />
         </div>

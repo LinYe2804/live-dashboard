@@ -8,9 +8,6 @@ on:
       windows_ref:
         description: 'Windows source branch/tag/SHA (default: main)'
         default: 'main'
-      macos_ref:
-        description: 'macOS source branch/tag/SHA (default: main)'
-        default: 'main'
       android_ref:
         description: 'Android source branch/tag/SHA (default: main)'
         default: 'main'
@@ -19,50 +16,6 @@ on:
 # Manual runs can override source refs via workflow_dispatch inputs.
 
 jobs:
-  build-windows-legacy:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: windows-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.windows_ref || 'windows-source' }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install dependencies
-        run: pip install -r agents/windows/requirements.txt pyinstaller
-      - name: Build executable
-        working-directory: agents/windows
-        run: pyinstaller --onefile --noconsole --name live-dashboard-agent agent.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-agent
-          path: agents/windows/dist/live-dashboard-agent.exe
-
-  build-macos:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: macos-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.macos_ref || 'macos-source' }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install dependencies
-        run: pip install -r agents/macos/requirements.txt pyinstaller
-      - name: Build executable
-        working-directory: agents/macos
-        run: pyinstaller --onefile --windowed --name live-dashboard-agent agent.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-agent
-          path: agents/macos/dist/live-dashboard-agent
-
   build-android:
     runs-on: ubuntu-latest
     permissions:
@@ -172,7 +125,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.android_ref || github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.windows_ref || github.sha }}
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@v4
         with:
@@ -187,15 +140,39 @@ jobs:
             $version = "dev-${{ github.run_number }}"
           }
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+      - name: Prepare optional Authenticode certificate
+        id: winsign
+        shell: pwsh
+        env:
+          WINDOWS_CODE_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_CODE_SIGNING_PFX_BASE64 }}
+          WINDOWS_CODE_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_PFX_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CODE_SIGNING_PFX_BASE64) -or
+              [string]::IsNullOrWhiteSpace($env:WINDOWS_CODE_SIGNING_PFX_PASSWORD)) {
+            "certificate_path=" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Host "Code-signing secrets are not configured; producing an unsigned package."
+            exit 0
+          }
+
+          $certificatePath = Join-Path $env:RUNNER_TEMP "windows-agent-signing.pfx"
+          [IO.File]::WriteAllBytes(
+            $certificatePath,
+            [Convert]::FromBase64String($env:WINDOWS_CODE_SIGNING_PFX_BASE64)
+          )
+          "certificate_path=$certificatePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
       - name: Build Windows package zip
         shell: pwsh
         working-directory: packages/windows-agent
+        env:
+          WINDOWS_CODE_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_PFX_PASSWORD }}
         run: |
           .\build-release.ps1 `
             -Version "${{ steps.winver.outputs.version }}" `
             -Runtime "win-x64" `
             -PackageName "live-dashboard-windows-agent" `
-            -DisplayName "Live Dashboard Windows Agent"
+            -DisplayName "Live Dashboard Windows Agent" `
+            -SigningCertificatePath "${{ steps.winsign.outputs.certificate_path }}" `
+            -SigningCertificatePassword "$env:WINDOWS_CODE_SIGNING_PFX_PASSWORD"
       - name: Resolve Windows zip artifact
         id: winzip
         shell: pwsh
@@ -235,9 +212,13 @@ jobs:
           mv android-agent/live-dashboard-android-agent.apk .
           mv android-agent/live-dashboard-kernelsu-module.zip .
           cp windows-agent/*.zip .
+          sha256sum live-dashboard-android-agent.apk live-dashboard-kernelsu-module.zip live-dashboard-windows-agent-*.zip > SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             live-dashboard-android-agent.apk
             live-dashboard-kernelsu-module.zip
             live-dashboard-windows-agent-*.zip
+            SHA256SUMS.txt

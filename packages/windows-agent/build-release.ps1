@@ -5,7 +5,10 @@ param(
     [string]$DisplayName = "Live Dashboard Windows Agent",
     [string]$Tagline = "Windows foreground reporter for Live Dashboard.",
     [string]$PostInstallNote = 'If you see "OK ..." in console, reporting works.',
-    [string]$DotnetPath = ""
+    [string]$DotnetPath = "",
+    [string]$SigningCertificatePath = "",
+    [string]$SigningCertificatePassword = "",
+    [string]$TimestampUrl = "http://timestamp.digicert.com"
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,12 +58,44 @@ function Resolve-Dotnet {
     throw "dotnet not found. Please install .NET SDK 10+ or add dotnet to PATH."
 }
 
+function Resolve-AssemblyVersion {
+    param([string]$Value)
+
+    if ($Value -match "(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)") {
+        return "$($Matches.major).$($Matches.minor).$($Matches.patch)"
+    }
+
+    return "1.0.0"
+}
+
+function Resolve-SignTool {
+    $command = Get-Command "signtool.exe" -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    $kitsRoot = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
+    if (Test-Path $kitsRoot) {
+        $candidate = Get-ChildItem -Path $kitsRoot -Filter "signtool.exe" -File -Recurse |
+            Where-Object { $_.FullName -match "\\x64\\signtool\.exe$" } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+        if ($candidate) {
+            return $candidate.FullName
+        }
+    }
+
+    throw "Signing certificate was supplied, but signtool.exe was not found."
+}
+
 $dotnet = Resolve-Dotnet
 $safePackageName = Normalize-FileName -Value $PackageName
+$safeVersion = Normalize-FileName -Value $Version
 $packageExeName = "$safePackageName.exe"
-$publishDir = Join-Path $scriptDir "publish\$runtime"
+$assemblyVersion = Resolve-AssemblyVersion -Value $Version
+$publishDir = Join-Path $scriptDir "dist\.publish\$runtime"
 $stageDir = Join-Path $scriptDir "dist\$safePackageName"
-$zipName = "$safePackageName-$runtime.zip"
+$zipName = "$safePackageName-$safeVersion-$runtime.zip"
 $zipPath = Join-Path $scriptDir "dist\$zipName"
 
 $publishMode = "self-contained"
@@ -73,7 +108,13 @@ if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
     -c Release `
     -r $runtime `
     --self-contained true `
-    -p:PublishSingleFile=true `
+    -p:AssemblyName=$safePackageName `
+    -p:Version=$assemblyVersion `
+    -p:FileVersion="$assemblyVersion.0" `
+    -p:InformationalVersion=$Version `
+    -p:PublishSingleFile=false `
+    -p:PublishTrimmed=false `
+    -p:ContinuousIntegrationBuild=true `
     -p:DebugType=None `
     -p:DebugSymbols=false `
     -o $publishDir
@@ -88,6 +129,13 @@ if ($LASTEXITCODE -ne 0) {
         -c Release `
         -r $runtime `
         --self-contained false `
+        -p:AssemblyName=$safePackageName `
+        -p:Version=$assemblyVersion `
+        -p:FileVersion="$assemblyVersion.0" `
+        -p:InformationalVersion=$Version `
+        -p:PublishSingleFile=false `
+        -p:PublishTrimmed=false `
+        -p:ContinuousIntegrationBuild=true `
         -p:DebugType=None `
         -p:DebugSymbols=false `
         -o $publishDir
@@ -97,13 +145,42 @@ if ($LASTEXITCODE -ne 0) {
     }
 }
 
+$publishedExe = Join-Path $publishDir $packageExeName
+if (-not (Test-Path $publishedExe)) {
+    throw "Published executable not found: $publishedExe"
+}
+
+$signatureStatus = "unsigned"
+if (-not [string]::IsNullOrWhiteSpace($SigningCertificatePath)) {
+    if (-not (Test-Path $SigningCertificatePath)) {
+        throw "Signing certificate does not exist: $SigningCertificatePath"
+    }
+    if ([string]::IsNullOrWhiteSpace($SigningCertificatePassword)) {
+        throw "SigningCertificatePassword is required when a signing certificate is supplied."
+    }
+
+    $signTool = Resolve-SignTool
+    & $signTool sign `
+        /fd SHA256 `
+        /td SHA256 `
+        /tr $TimestampUrl `
+        /f $SigningCertificatePath `
+        /p $SigningCertificatePassword `
+        $publishedExe
+    if ($LASTEXITCODE -ne 0) {
+        throw "Authenticode signing failed."
+    }
+
+    & $signTool verify /pa /v $publishedExe
+    if ($LASTEXITCODE -ne 0) {
+        throw "Authenticode signature verification failed."
+    }
+    $signatureStatus = "authenticode"
+}
+
 New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
 
 Copy-Item (Join-Path $publishDir "*") $stageDir -Recurse -Force
-
-if (Test-Path (Join-Path $stageDir "WindowsAgent.exe")) {
-    Copy-Item (Join-Path $stageDir "WindowsAgent.exe") (Join-Path $stageDir $packageExeName) -Force
-}
 
 Copy-Item ".\appsettings.example.json" (Join-Path $stageDir "appsettings.example.json") -Force
 Copy-Item ".\appsettings.example.json" (Join-Path $stageDir "appsettings.json") -Force
@@ -117,6 +194,8 @@ $DisplayName
 Version: $Version
 Package Name: $safePackageName
 Package Mode: $publishMode
+Packaging: native .NET multi-file (not PyInstaller or a self-extracting single file)
+Signature: $signatureStatus
 
 $Tagline
 
@@ -128,6 +207,7 @@ How to use:
 $PostInstallNote
 
 If Package Mode is framework-dependent, install .NET Runtime 10 x64 first.
+Verify downloaded files against SHA256SUMS.txt before running them.
 "@
 
 Set-Content -Path (Join-Path $stageDir "README.txt") -Value $readmeTxt -Encoding UTF8
@@ -138,10 +218,22 @@ $packageMeta = [ordered]@{
     packageName = $safePackageName
     displayName = $DisplayName
     packageMode = $publishMode
+    packaging = "dotnet-multifile"
+    signature = $signatureStatus
     executableName = $packageExeName
 }
 
 $packageMeta | ConvertTo-Json | Set-Content -Path (Join-Path $stageDir "package-meta.json") -Encoding UTF8
+
+$checksumLines = Get-ChildItem -Path $stageDir -File -Recurse |
+    Where-Object { $_.Name -ne "SHA256SUMS.txt" } |
+    Sort-Object FullName |
+    ForEach-Object {
+        $relativePath = [System.IO.Path]::GetRelativePath($stageDir, $_.FullName).Replace("\", "/")
+        $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        "$hash  $relativePath"
+    }
+$checksumLines | Set-Content -Path (Join-Path $stageDir "SHA256SUMS.txt") -Encoding ASCII
 
 Compress-Archive -Path (Join-Path $stageDir "*") -DestinationPath $zipPath -CompressionLevel Optimal
 

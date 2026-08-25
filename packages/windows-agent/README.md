@@ -14,7 +14,7 @@
 
 ## 给别人直接下载使用（推荐）
 
-1. 让对方下载发布包 zip（例如 `live-dashboard-windows-agent-win-x64.zip`）。
+1. 让对方下载发布包 zip（例如 `live-dashboard-windows-agent-v2.1.0-win-x64.zip`）。
 2. 解压后双击 `start-agent.bat` 启动。
 3. 在弹出的设置窗口中填写：
 
@@ -78,36 +78,32 @@ dotnet publish .\WindowsAgent.csproj -c Release -r win-x64 --self-contained fals
 脚本会在 `dist` 目录下生成可直接分发的 zip 包，里面包含：
 
 - `<PackageName>.exe`（按参数生成，例如 `acme-windows-agent.exe`）
+- .NET 自包含运行文件（多文件，不使用 PyInstaller 或单文件自解压器）
 - `appsettings.json`（默认模板）
 - `appsettings.example.json`
 - `start-agent.bat`
 - `README.txt`
 - `package-meta.json`
+- `SHA256SUMS.txt`
 
 说明：
 
-- 脚本优先生成自包含包（目标机器无需安装 .NET）。
+- 脚本优先生成 .NET 自包含多文件包（目标机器无需安装 .NET）。相比 PyInstaller/单文件自解压包，这种形式更透明，也能降低启发式误报，但未签名程序仍无法保证被所有杀毒软件信任。
 - 若当前网络/源导致自包含发布失败，会自动降级为框架依赖包。
 - 框架依赖包需要目标机器安装 .NET Runtime 10 x64。
+- 可通过 `-SigningCertificatePath` 和 `-SigningCertificatePassword` 使用 Authenticode 证书签名；GitHub Actions 对应 Secrets 为 `WINDOWS_CODE_SIGNING_PFX_BASE64`、`WINDOWS_CODE_SIGNING_PFX_PASSWORD`。
+- 下载发布包后可用 `SHA256SUMS.txt` 校验文件完整性。
 
 ## GitHub 自动打包发布
 
-新增工作流：`.github/workflows/windows-agent-release.yml`
+统一发布工作流：`.github/workflows/build-agents.yml`
 
 触发方式：
 
-- 推送 tag（自动发布）：`windows-agent-v*`
-- 手动触发（可自定义包名和文案）：`Actions -> Windows Agent Release -> Run workflow`
+- 推送 `v*` tag：构建 Android、KernelSU 和 Windows Agent，并自动创建 GitHub Release。
+- 手动触发：构建可下载的 Actions artifacts，不创建正式 Release。
 
-手动触发时可配置：
-
-- `version`
-- `runtime`
-- `package_name`
-- `display_name`
-- `tagline`
-- `post_install_note`
-- `create_release`（是否自动发布到 GitHub Release）
+手动触发时可分别选择 Windows 与 Android/KernelSU 的源码分支、tag 或 SHA。
 
 ## 说明
 

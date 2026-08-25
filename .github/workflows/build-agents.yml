@@ -85,15 +85,12 @@ jobs:
             gradle -q :app:assembleDebug
           fi
       - name: Build KernelSU root module
-        env:
-          CGO_ENABLED: '0'
-          GOOS: android
-          GOARCH: arm64
         run: |
           mkdir -p packages/android-root-module/module/bin
           cd packages/android-root-module/daemon
           go test ./...
-          go build -trimpath -ldflags='-s -w' -o ../module/bin/live-dashboard-daemon .
+          CGO_ENABLED=0 GOOS=android GOARCH=arm64 \
+            go build -trimpath -ldflags='-s -w' -o ../module/bin/live-dashboard-daemon .
           cd ../module
           zip -9 -r ../../../live-dashboard-kernelsu-module.zip .
       - name: Prepare APK artifact
